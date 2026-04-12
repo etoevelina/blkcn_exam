@@ -1,0 +1,4 @@
+* text=auto eol=lf
+*.sol linguist-language=Solidity
+*.toml linguist-language=TOML
+docs/* linguist-documentation
