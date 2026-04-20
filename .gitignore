@@ -1,8 +1,8 @@
-# Foundry
-out/
-cache/
-broadcast/
-lib/
+# Foundry (anchored to repo root so we don't shadow frontend/src/lib etc.)
+/out/
+/cache/
+/broadcast/
+/lib/
 
 # Coverage
 lcov.info
@@ -20,7 +20,7 @@ coverage/
 *.swp
 *.log
 
-# Node (frontend lives in /frontend, added in W9)
+# Node (frontend lives in /frontend)
 node_modules/
 dist/
 .next/
