@@ -1,0 +1,168 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Cancel in-flight CI when a new commit is pushed to the same PR.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write    # for slither PR comments
+
+jobs:
+  contracts:
+    name: Foundry — build + test + coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      FOUNDRY_PROFILE: ci
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: nightly-2025-04-01
+
+      - name: Cache Foundry build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.foundry/cache
+            cache
+            out
+          key: foundry-${{ runner.os }}-${{ hashFiles('foundry.toml', 'remappings.txt', 'lib/**') }}
+
+      - name: forge install
+        run: |
+          forge install --no-git foundry-rs/forge-std@v1.9.4 || true
+          forge install --no-git OpenZeppelin/openzeppelin-contracts@v5.0.2 || true
+          forge install --no-git OpenZeppelin/openzeppelin-contracts-upgradeable@v5.0.2 || true
+          forge install --no-git smartcontractkit/chainlink-brownie-contracts@v1.2.0 || true
+
+      - name: forge fmt --check
+        run: forge fmt --check
+
+      - name: forge build
+        run: forge build --sizes
+
+      - name: forge test
+        run: forge test -vvv
+
+      - name: forge coverage (lcov)
+        run: forge coverage --report lcov --report summary | tee coverage-summary.txt
+
+      - name: Enforce ≥ 90% line coverage
+        run: |
+          # Coverage on the `src/` directory only.
+          lcov_total=$(grep -E '^(Total|TOTAL)' coverage-summary.txt | awk '{ print $4 }' | tr -d '%' | head -n1)
+          echo "Coverage: $lcov_total%"
+          awk -v c="$lcov_total" 'BEGIN { if (c+0 < 90) { print "FAIL: coverage <90%"; exit 1 } }'
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: coverage-lcov
+          path: lcov.info
+
+  slither:
+    name: Slither — zero High / zero Medium
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: contracts
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: nightly-2025-04-01
+
+      - name: forge install
+        run: |
+          forge install --no-commit --no-git foundry-rs/forge-std@v1.9.4 || true
+          forge install --no-commit --no-git OpenZeppelin/openzeppelin-contracts@v5.0.2 || true
+          forge install --no-commit --no-git OpenZeppelin/openzeppelin-contracts-upgradeable@v5.0.2 || true
+
+      - name: Run Slither
+        uses: crytic/slither-action@v0.4.0
+        id: slither
+        with:
+          target: "."
+          slither-config: slither.config.json
+          fail-on: medium
+          sarif: slither.sarif
+
+      - name: Upload SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: ${{ steps.slither.outputs.sarif }}
+
+  solhint:
+    name: Solhint
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: npx --yes solhint@5.0.3 "src/**/*.sol" "script/**/*.sol" "test/**/*.sol"
+
+  subgraph:
+    name: Subgraph — codegen + build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: subgraph
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.7.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: pnpm
+          cache-dependency-path: subgraph/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile || pnpm install
+      - run: pnpm codegen
+      - run: pnpm build
+
+  frontend:
+    name: Frontend — lint + typecheck + build
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.7.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile || pnpm install
+      - run: pnpm format:check
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm build
+        env:
+          NEXT_PUBLIC_TARGET_CHAIN_ID: "421614"
+          NEXT_PUBLIC_SUBGRAPH_URL: "https://api.studio.thegraph.com/query/0/prediction-market/version/latest"
+          NEXT_PUBLIC_RPC_URL: "https://sepolia-rollup.arbitrum.io/rpc"
