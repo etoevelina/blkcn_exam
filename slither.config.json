@@ -1,0 +1,12 @@
+{
+  "compile_force_framework": "foundry",
+  "filter_paths": "lib/|test/|script/|node_modules/",
+  "exclude_dependencies": true,
+  "exclude_informational": false,
+  "exclude_low": false,
+  "exclude_medium": false,
+  "exclude_high": false,
+  "exclude_optimization": true,
+  "disable_color": true,
+  "json": "slither-report.json"
+}
