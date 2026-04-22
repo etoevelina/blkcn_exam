@@ -1,0 +1,28 @@
+{
+  "name": "blkcn-exam-root",
+  "private": true,
+  "description": "Repo-root tooling for the BChT2 Prediction Market capstone (pre-commit hooks, lint orchestration).",
+  "scripts": {
+    "prepare": "husky",
+    "lint:sol": "solhint 'src/**/*.sol' 'script/**/*.sol' 'test/**/*.sol'",
+    "fmt:sol": "forge fmt",
+    "fmt:check:sol": "forge fmt --check",
+    "fmt:check:fe": "cd frontend && pnpm format:check",
+    "lint:fe": "cd frontend && pnpm lint",
+    "test:contracts": "forge test -vvv",
+    "coverage:contracts": "forge coverage --report summary",
+    "ci:all": "pnpm fmt:check:sol && pnpm lint:sol && pnpm test:contracts && pnpm fmt:check:fe && pnpm lint:fe"
+  },
+  "devDependencies": {
+    "husky": "^9.1.4",
+    "lint-staged": "^15.2.7",
+    "solhint": "^5.0.3"
+  },
+  "lint-staged": {
+    "src/**/*.sol": ["forge fmt --check"],
+    "script/**/*.sol": ["forge fmt --check"],
+    "test/**/*.sol": ["forge fmt --check"],
+    "*.sol": ["solhint"],
+    "frontend/**/*.{ts,tsx,js,jsx,json,md}": ["prettier --check"]
+  }
+}
