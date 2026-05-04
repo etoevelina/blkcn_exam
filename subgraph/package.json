@@ -1,0 +1,22 @@
+{
+  "name": "prediction-market-subgraph",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The Graph subgraph for the BChT2 On-Chain Prediction Market capstone (Arbitrum Sepolia).",
+  "license": "MIT",
+  "scripts": {
+    "codegen": "graph codegen",
+    "build": "graph build",
+    "test": "graph test",
+    "deploy:studio": "graph deploy --node https://api.studio.thegraph.com/deploy/ prediction-market",
+    "create:local": "graph create --node http://localhost:8020/ prediction-market-local",
+    "deploy:local": "graph deploy --node http://localhost:8020/ --ipfs http://localhost:5001 prediction-market-local"
+  },
+  "dependencies": {
+    "@graphprotocol/graph-cli": "0.79.2",
+    "@graphprotocol/graph-ts": "0.35.1"
+  },
+  "devDependencies": {
+    "matchstick-as": "0.6.0"
+  }
+}
