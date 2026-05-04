@@ -1,0 +1,12 @@
+{
+  "arbitrum-sepolia": {
+    "PredictionMarketFactory": {
+      "address": "0x0000000000000000000000000000000000000000",
+      "startBlock": 0
+    },
+    "PredictionGovernor": {
+      "address": "0x0000000000000000000000000000000000000000",
+      "startBlock": 0
+    }
+  }
+}

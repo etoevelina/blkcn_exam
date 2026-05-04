@@ -1,0 +1,197 @@
+# =============================================================================
+# Schema — BChT2 On-Chain Prediction Market subgraph
+# =============================================================================
+#
+# 7 entities, all indexed by Mermaid-friendly relations.
+#
+#   Market        ◄──── Swap, LiquidityEvent, UserPosition
+#   Trader        ◄──── Swap, LiquidityEvent
+#   Proposal      ◄──── Vote
+#
+# Status enums mirror the Solidity enums on PredictionMarket.sol and the
+# OpenZeppelin Governor `state()` return value. The frontend maps these
+# to badge colours.
+# =============================================================================
+
+enum MarketStatus {
+  Open
+  Locked
+  Reported
+  Disputed
+  Finalized
+  Invalid
+}
+
+enum LiquidityEventKind {
+  Add
+  Remove
+}
+
+enum VoteSupport {
+  Against        # 0
+  For            # 1
+  Abstain        # 2
+}
+
+# OZ Governor.state() return values 0..7. Indexer copies the on-chain
+# event into Proposal.statusSnapshot at every state-changing event so
+# we can serve a quick approximation; frontend cross-checks via
+# `governor.state(proposalId)` for authoritative state.
+enum ProposalStatus {
+  Pending
+  Active
+  Canceled
+  Defeated
+  Succeeded
+  Queued
+  Expired
+  Executed
+}
+
+# -----------------------------------------------------------------------------
+# Market — one per PredictionMarket contract spawned by the factory.
+# -----------------------------------------------------------------------------
+type Market @entity {
+  id: ID!                           # market contract address (lower-case hex)
+  marketId: BigInt!                 # uint64 from the factory
+  factory: Bytes!                   # factory address
+  questionId: Bytes!                # bytes32 question hash
+  oracleThreshold: BigInt!          # int256 — store as BigInt
+  collateralToken: Bytes!
+  outcomeToken: Bytes!
+  yesId: BigInt!
+  noId: BigInt!
+  feeBps: Int!
+  tradingEndsAt: BigInt!
+  disputeEndsAt: BigInt              # nullable until reportOutcome
+  status: MarketStatus!
+  winningOutcome: Int                # 0/1, null until finalized
+  reserveYes: BigInt!
+  reserveNo: BigInt!
+  totalLpSupply: BigInt!
+  swapCount: BigInt!
+  liquidityEventCount: BigInt!
+  deterministic: Boolean!
+  creator: Bytes!
+  createdAt: BigInt!                 # block timestamp
+  createdAtBlock: BigInt!
+  lastUpdatedAt: BigInt!
+
+  # Derived (descending by timestamp)
+  swaps: [Swap!]! @derivedFrom(field: "market")
+  liquidityEvents: [LiquidityEvent!]! @derivedFrom(field: "market")
+  positions: [UserPosition!]! @derivedFrom(field: "market")
+}
+
+# -----------------------------------------------------------------------------
+# Trader — any address that has ever swapped or LP'd.
+# -----------------------------------------------------------------------------
+type Trader @entity {
+  id: ID!                            # address (lower-case hex)
+  swapCount: BigInt!
+  liquidityEventCount: BigInt!
+  totalVolumeIn: BigInt!             # sum of amountIn across swaps
+  totalFeesPaid: BigInt!             # sum of feeAccrued (sender side)
+  firstSeenAt: BigInt!
+  lastSeenAt: BigInt!
+
+  swaps: [Swap!]! @derivedFrom(field: "trader")
+  liquidityEvents: [LiquidityEvent!]! @derivedFrom(field: "provider")
+}
+
+# -----------------------------------------------------------------------------
+# Swap — one row per Swap event on a PredictionMarket.
+# -----------------------------------------------------------------------------
+type Swap @entity(immutable: true) {
+  id: ID!                            # txHash-logIndex
+  market: Market!
+  trader: Trader!
+  outcomeInId: BigInt!
+  outcomeOutId: BigInt!
+  amountIn: BigInt!
+  amountOut: BigInt!
+  feeAccrued: BigInt!
+  reserveYesAfter: BigInt!
+  reserveNoAfter: BigInt!
+  timestamp: BigInt!
+  blockNumber: BigInt!
+  transactionHash: Bytes!
+}
+
+# -----------------------------------------------------------------------------
+# LiquidityEvent — Add or Remove.
+# -----------------------------------------------------------------------------
+type LiquidityEvent @entity(immutable: true) {
+  id: ID!                            # txHash-logIndex
+  market: Market!
+  provider: Trader!
+  kind: LiquidityEventKind!
+  collateralIn: BigInt!              # 0 for Remove
+  lpAmount: BigInt!                  # minted or burnt
+  yesAmount: BigInt!                 # added (Add) or returned (Remove)
+  noAmount: BigInt!
+  timestamp: BigInt!
+  blockNumber: BigInt!
+  transactionHash: Bytes!
+}
+
+# -----------------------------------------------------------------------------
+# Proposal — one per OZ Governor proposalId.
+# -----------------------------------------------------------------------------
+type Proposal @entity {
+  id: ID!                            # proposalId as uint256 hex
+  governor: Bytes!
+  proposer: Bytes!
+  description: String!
+  descriptionHash: Bytes!
+  targets: [Bytes!]!
+  values: [BigInt!]!
+  signatures: [String!]!
+  calldatas: [Bytes!]!
+  voteStart: BigInt!
+  voteEnd: BigInt!
+  forVotes: BigInt!
+  againstVotes: BigInt!
+  abstainVotes: BigInt!
+  statusSnapshot: ProposalStatus!    # cached; frontend cross-checks on-chain
+  eta: BigInt                        # timelock execution time, nullable
+  queuedAt: BigInt
+  executedAt: BigInt
+  canceledAt: BigInt
+  createdAt: BigInt!
+  createdAtBlock: BigInt!
+
+  votes: [Vote!]! @derivedFrom(field: "proposal")
+}
+
+# -----------------------------------------------------------------------------
+# Vote — one per VoteCast on a Proposal.
+# -----------------------------------------------------------------------------
+type Vote @entity(immutable: true) {
+  id: ID!                            # proposalId-voter
+  proposal: Proposal!
+  voter: Bytes!
+  support: VoteSupport!
+  weight: BigInt!
+  reason: String!
+  timestamp: BigInt!
+  blockNumber: BigInt!
+  transactionHash: Bytes!
+}
+
+# -----------------------------------------------------------------------------
+# UserPosition — user × market roll-up.
+# Updated on Swap, LiquidityAdded, LiquidityRemoved, WinningsClaimed,
+# CompleteSetsMinted, CompleteSetsRedeemed (via ERC-1155 TransferSingle
+# bridging on the OutcomeToken1155 data source — see market.ts).
+# -----------------------------------------------------------------------------
+type UserPosition @entity {
+  id: ID!                            # `${user}-${market}`
+  user: Bytes!
+  market: Market!
+  yesBalance: BigInt!
+  noBalance: BigInt!
+  lpBalance: BigInt!
+  collateralClaimed: BigInt!         # cumulative from claimWinnings()
+  lastUpdatedAt: BigInt!
+}

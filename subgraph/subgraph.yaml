@@ -1,0 +1,117 @@
+specVersion: 0.0.5
+description: BChT2 On-Chain Prediction Market — Arbitrum Sepolia (Option D capstone)
+repository: https://github.com/etoevelina/blkcn_exam
+schema:
+  file: ./schema.graphql
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Root data sources. Each new PredictionMarket is spawned via the
+# `PredictionMarket` template (see below) when the factory emits MarketCreated.
+# ─────────────────────────────────────────────────────────────────────────────
+dataSources:
+  - kind: ethereum/contract
+    name: PredictionMarketFactory
+    network: arbitrum-sepolia
+    source:
+      address: "0x0000000000000000000000000000000000000000"   # populated by Deploy.s.sol → networks.json
+      abi: PredictionMarketFactory
+      startBlock: 0                                            # populated per chain by networks.json
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      file: ./src/factory.ts
+      entities:
+        - Market
+        - Trader
+      abis:
+        - name: PredictionMarketFactory
+          file: ./abis/PredictionMarketFactory.json
+      eventHandlers:
+        - event: MarketCreated(indexed uint64,indexed address,indexed bytes32,uint64,uint16,bool)
+          handler: handleMarketCreated
+        - event: DefaultsUpdated(uint16,uint32)
+          handler: handleDefaultsUpdated
+        - event: Upgraded(indexed address)
+          handler: handleUpgraded
+
+  - kind: ethereum/contract
+    name: PredictionGovernor
+    network: arbitrum-sepolia
+    source:
+      address: "0x0000000000000000000000000000000000000000"   # W9 — populated when Governor deploys
+      abi: PredictionGovernor
+      startBlock: 0
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      file: ./src/governor.ts
+      entities:
+        - Proposal
+        - Vote
+      abis:
+        - name: PredictionGovernor
+          file: ./abis/PredictionGovernor.json
+      eventHandlers:
+        - event: ProposalCreated(uint256,address,address[],uint256[],string[],bytes[],uint256,uint256,string)
+          handler: handleProposalCreated
+        - event: VoteCast(indexed address,uint256,uint8,uint256,string)
+          handler: handleVoteCast
+        - event: VoteCastWithParams(indexed address,uint256,uint8,uint256,string,bytes)
+          handler: handleVoteCastWithParams
+        - event: ProposalQueued(uint256,uint256)
+          handler: handleProposalQueued
+        - event: ProposalExecuted(uint256)
+          handler: handleProposalExecuted
+        - event: ProposalCanceled(uint256)
+          handler: handleProposalCanceled
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Templates — one dynamic data source per spawned market.
+# ─────────────────────────────────────────────────────────────────────────────
+templates:
+  - kind: ethereum/contract
+    name: PredictionMarket
+    network: arbitrum-sepolia
+    source:
+      abi: PredictionMarket
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      file: ./src/market.ts
+      entities:
+        - Market
+        - Swap
+        - LiquidityEvent
+        - Trader
+        - UserPosition
+      abis:
+        - name: PredictionMarket
+          file: ./abis/PredictionMarket.json
+      eventHandlers:
+        - event: Swap(indexed address,indexed uint256,indexed uint256,uint256,uint256,uint256)
+          handler: handleSwap
+        - event: LiquidityAdded(indexed address,uint256,uint256,uint256,uint256)
+          handler: handleLiquidityAdded
+        - event: LiquidityRemoved(indexed address,uint256,uint256,uint256)
+          handler: handleLiquidityRemoved
+        - event: CompleteSetsMinted(indexed address,uint256)
+          handler: handleCompleteSetsMinted
+        - event: CompleteSetsRedeemed(indexed address,uint256)
+          handler: handleCompleteSetsRedeemed
+        - event: MarketLocked(uint64)
+          handler: handleMarketLocked
+        - event: OutcomeReported(indexed uint8,uint64,uint64)
+          handler: handleOutcomeReported
+        - event: DisputeRaised(indexed address,uint64)
+          handler: handleDisputeRaised
+        - event: DisputeResolved(indexed uint8,indexed address)
+          handler: handleDisputeResolved
+        - event: MarketFinalized(indexed uint8)
+          handler: handleMarketFinalized
+        - event: MarketInvalidated(indexed address,string)
+          handler: handleMarketInvalidated
+        - event: WinningsClaimed(indexed address,uint256,uint256)
+          handler: handleWinningsClaimed
