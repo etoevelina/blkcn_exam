@@ -1,0 +1,36 @@
+# =============================================================================
+# Q1 — ActiveMarkets
+#
+# Powers the home page list. Returns every market that has not yet been
+# Finalized or Invalidated, sorted by `tradingEndsAt` ascending so the
+# soonest-resolving markets sit at the top.
+#
+# Variables:
+#   first    Int — page size (default 25).
+#   skip     Int — pagination offset.
+#
+# Used by: frontend `app/page.tsx` → useMarkets hook.
+# =============================================================================
+query ActiveMarkets($first: Int = 25, $skip: Int = 0) {
+  markets(
+    first: $first
+    skip: $skip
+    where: { status_in: [Open, Locked, Reported, Disputed] }
+    orderBy: tradingEndsAt
+    orderDirection: asc
+  ) {
+    id
+    marketId
+    questionId
+    feeBps
+    status
+    tradingEndsAt
+    disputeEndsAt
+    reserveYes
+    reserveNo
+    totalLpSupply
+    swapCount
+    winningOutcome
+    createdAt
+  }
+}

@@ -1,0 +1,38 @@
+# =============================================================================
+# Q5 — MarketStats
+#
+# Top-N markets by swap activity, plus the trader on top of each. Powers
+# the "Top markets" widget on the home page sidebar.
+#
+# Used by: frontend `components/MarketStatsWidget.tsx`.
+#
+# Variables:
+#   first  Int — number of markets to return (default 10).
+# =============================================================================
+query MarketStats($first: Int = 10) {
+  markets(
+    first: $first
+    orderBy: swapCount
+    orderDirection: desc
+    where: { status_in: [Open, Locked, Reported, Finalized] }
+  ) {
+    id
+    marketId
+    questionId
+    status
+    swapCount
+    liquidityEventCount
+    totalLpSupply
+    reserveYes
+    reserveNo
+    feeBps
+    tradingEndsAt
+  }
+
+  traders(first: 5, orderBy: totalVolumeIn, orderDirection: desc) {
+    id
+    swapCount
+    totalVolumeIn
+    totalFeesPaid
+  }
+}

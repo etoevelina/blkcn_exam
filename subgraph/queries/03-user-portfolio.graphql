@@ -1,0 +1,38 @@
+# =============================================================================
+# Q3 — UserPortfolio
+#
+# All UserPositions for a given user address, joined with the parent
+# market for convenience. Filters out zero-only positions client-side.
+#
+# Used by: frontend `app/portfolio/page.tsx`.
+#
+# Variables:
+#   user   Bytes! — user address as lower-case hex.
+#   first  Int    — max positions to return.
+# =============================================================================
+query UserPortfolio($user: Bytes!, $first: Int = 50) {
+  userPositions(
+    first: $first
+    where: { user: $user }
+    orderBy: lastUpdatedAt
+    orderDirection: desc
+  ) {
+    id
+    yesBalance
+    noBalance
+    lpBalance
+    collateralClaimed
+    lastUpdatedAt
+    market {
+      id
+      marketId
+      questionId
+      status
+      winningOutcome
+      reserveYes
+      reserveNo
+      totalLpSupply
+      tradingEndsAt
+    }
+  }
+}
