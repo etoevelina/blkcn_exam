@@ -1,0 +1,58 @@
+# =============================================================================
+# Q2 — MarketDetail
+#
+# Single market by id with its recent activity (swaps, liquidity events).
+# Used by: frontend `app/markets/[id]/page.tsx`.
+#
+# Variables:
+#   id         ID!    — market contract address (lower-case hex).
+#   recent     Int    — how many recent items to pull (default 20).
+# =============================================================================
+query MarketDetail($id: ID!, $recent: Int = 20) {
+  market(id: $id) {
+    id
+    marketId
+    questionId
+    oracleThreshold
+    collateralToken
+    outcomeToken
+    yesId
+    noId
+    feeBps
+    status
+    tradingEndsAt
+    disputeEndsAt
+    reserveYes
+    reserveNo
+    totalLpSupply
+    swapCount
+    liquidityEventCount
+    winningOutcome
+    creator
+    createdAt
+
+    swaps(first: $recent, orderBy: timestamp, orderDirection: desc) {
+      id
+      trader { id }
+      outcomeInId
+      outcomeOutId
+      amountIn
+      amountOut
+      feeAccrued
+      timestamp
+      transactionHash
+    }
+
+    liquidityEvents(first: $recent, orderBy: timestamp, orderDirection: desc) {
+      id
+      provider { id }
+      kind
+      collateralIn
+      lpAmount
+      yesAmount
+      noAmount
+      timestamp
+      transactionHash
+    }
+  }
+}

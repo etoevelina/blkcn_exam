@@ -1,0 +1,42 @@
+# =============================================================================
+# Q4 — ActiveProposals
+#
+# All governance proposals not in a terminal state (still Pending, Active,
+# Queued, or Succeeded-but-not-queued). The frontend cross-checks each
+# with `governor.state(proposalId)` to avoid indexer lag misleading users.
+#
+# Used by: frontend `app/governance/page.tsx` → useProposals hook.
+#
+# Variables:
+#   first   Int — page size (default 50).
+# =============================================================================
+query ActiveProposals($first: Int = 50) {
+  proposals(
+    first: $first
+    where: { statusSnapshot_in: [Pending, Active, Succeeded, Queued] }
+    orderBy: createdAt
+    orderDirection: desc
+  ) {
+    id
+    proposer
+    description
+    voteStart
+    voteEnd
+    forVotes
+    againstVotes
+    abstainVotes
+    statusSnapshot
+    eta
+    queuedAt
+    canceledAt
+    executedAt
+    createdAt
+    votes(first: 5, orderBy: timestamp, orderDirection: desc) {
+      voter
+      support
+      weight
+      reason
+      timestamp
+    }
+  }
+}
