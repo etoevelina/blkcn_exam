@@ -448,6 +448,10 @@ findings remain, all acknowledged and either fixed or justified above.
 
 **Recommendation:** ship.
 
+_Audit closed 16 May 2026. All Highs and Mediums are fixed; remaining
+Lows/Informationals are acknowledged in §6._
+
+
 Signed,
 
 * Daniyar (lead auditor)
