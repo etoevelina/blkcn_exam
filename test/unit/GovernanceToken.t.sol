@@ -16,9 +16,10 @@ contract GovernanceTokenTest is Fixture {
     }
 
     function test_mint_revertsAboveCap() public {
+        uint256 overCap = gov.CAP() + 1;
         vm.prank(admin);
         vm.expectRevert();
-        gov.mint(alice, gov.CAP() + 1);
+        gov.mint(alice, overCap);
     }
 
     function test_mint_byNonMinter_reverts() public {
@@ -34,7 +35,6 @@ contract GovernanceTokenTest is Fixture {
         vm.prank(alice);
         gov.delegate(alice);
 
-        // Voting power is recorded post-delegation; warp +1 so checkpoint sticks.
         vm.warp(block.timestamp + 1);
         assertEq(gov.getVotes(alice), 1_000e18);
     }

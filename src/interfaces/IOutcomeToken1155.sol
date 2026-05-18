@@ -20,17 +20,10 @@ import {IERC1155} from "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
 /// functions; those live on the concrete implementation under
 /// AccessControl, gated by the factory.
 interface IOutcomeToken1155 is IERC1155 {
-    /*//////////////////////////////////////////////////////////////
-                                 ERRORS
-    //////////////////////////////////////////////////////////////*/
 
     error NotMarketMinter(address caller, uint256 id);
     error MarketAlreadyRegistered(uint64 marketId);
     error InvalidMarket(address market);
-
-    /*//////////////////////////////////////////////////////////////
-                                 EVENTS
-    //////////////////////////////////////////////////////////////*/
 
     /// @notice Emitted when a new market is registered and granted
     ///         mint/burn authority over its YES/NO ids.
@@ -42,10 +35,6 @@ interface IOutcomeToken1155 is IERC1155 {
 
     /// @notice Emitted on `burn`.
     event OutcomeBurned(uint64 indexed marketId, uint256 indexed id, address indexed from, uint256 amount);
-
-    /*//////////////////////////////////////////////////////////////
-                              CORE ACTIONS
-    //////////////////////////////////////////////////////////////*/
 
     /// @notice Mint `amount` units of token `id` to `to`.
     /// @dev Reverts unless `msg.sender` holds the per-id `MARKET_MINTER_ROLE`.
@@ -61,10 +50,6 @@ interface IOutcomeToken1155 is IERC1155 {
     /// @dev Callable only by `FACTORY_ROLE` (the `PredictionMarketFactory`
     ///      proxy). Reverts if the market id is already registered.
     function registerMarket(uint64 marketId, address market) external;
-
-    /*//////////////////////////////////////////////////////////////
-                                  VIEWS
-    //////////////////////////////////////////////////////////////*/
 
     /// @notice Derive the YES token id for a market.
     function yesIdOf(uint64 marketId) external pure returns (uint256);

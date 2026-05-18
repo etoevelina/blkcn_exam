@@ -1,8 +1,5 @@
 import { PortfolioPanel } from "@/components/PortfolioPanel";
 
-// In W9 this page will also fetch the UserPortfolio subgraph query and
-// render position rows. For now: balances + voting power.
-
 export default function PortfolioPage() {
   return (
     <div className="space-y-8">

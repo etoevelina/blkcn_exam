@@ -47,29 +47,22 @@ contract PredictionMarketFactory is
     UUPSUpgradeable,
     IPredictionMarketFactory
 {
-    /*//////////////////////////////////////////////////////////////
-                                 ROLES
-    //////////////////////////////////////////////////////////////*/
 
     /// @notice May spawn new markets. Initially granted to the Timelock
     ///         so only successful governance proposals create markets;
     ///         the DAO can grant this role more broadly later.
     bytes32 public constant MARKET_CREATOR_ROLE = keccak256("MARKET_CREATOR_ROLE");
 
-    /*//////////////////////////////////////////////////////////////
-                          ERC-7201 NAMESPACED STORAGE
-    //////////////////////////////////////////////////////////////*/
-
     /// @custom:storage-location erc7201:prediction.market.factory.main
     struct FactoryStorage {
-        address protocolAdmin;     // Timelock — set as admin/keeper on every minted market
-        address oracleAdapter;     // wraps Chainlink
-        address feeVault;          // ERC-4626 fee receiver
-        address outcomeToken;      // singleton ERC-1155
-        address collateralToken;   // e.g. USDC
+        address protocolAdmin;
+        address oracleAdapter;
+        address feeVault;
+        address outcomeToken;
+        address collateralToken;
         uint64  nextMarketId;
         uint16  defaultFeeBps;
-        uint32  defaultDisputeWindow; // seconds
+        uint32  defaultDisputeWindow;
         mapping(uint64 => address) marketById;
         mapping(address => uint64) idByMarket;
     }
@@ -85,10 +78,6 @@ contract PredictionMarketFactory is
             $.slot := _FACTORY_STORAGE_SLOT
         }
     }
-
-    /*//////////////////////////////////////////////////////////////
-                              INITIALIZER
-    //////////////////////////////////////////////////////////////*/
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -117,7 +106,6 @@ contract PredictionMarketFactory is
         if (defaultDisputeWindow_ == 0) revert InvalidWindow();
 
         __AccessControl_init();
-        __UUPSUpgradeable_init();
 
         FactoryStorage storage $ = _factoryStorage();
         $.protocolAdmin = admin_;
@@ -127,17 +115,13 @@ contract PredictionMarketFactory is
         $.collateralToken = collateralToken_;
         $.defaultFeeBps = defaultFeeBps_;
         $.defaultDisputeWindow = defaultDisputeWindow_;
-        $.nextMarketId = 1;     // marketId 0 is reserved (sentinel for "unknown")
+        $.nextMarketId = 1;
 
         _grantRole(DEFAULT_ADMIN_ROLE, admin_);
         _grantRole(MARKET_CREATOR_ROLE, marketCreator_ == address(0) ? admin_ : marketCreator_);
 
         emit DefaultsUpdated(defaultFeeBps_, defaultDisputeWindow_);
     }
-
-    /*//////////////////////////////////////////////////////////////
-                              UUPS UPGRADE
-    //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc UUPSUpgradeable
     /// @dev Restricted to Timelock (`DEFAULT_ADMIN_ROLE`). V1 → V2 path
@@ -146,10 +130,6 @@ contract PredictionMarketFactory is
         if (newImplementation == address(0)) revert ZeroAddress();
         emit Upgraded(newImplementation);
     }
-
-    /*//////////////////////////////////////////////////////////////
-                              ADMIN (TIMELOCK)
-    //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IPredictionMarketFactory
     function setDefaults(uint16 newDefaultFeeBps, uint32 newDisputeWindow) external onlyRole(DEFAULT_ADMIN_ROLE) {
@@ -160,10 +140,6 @@ contract PredictionMarketFactory is
         $.defaultDisputeWindow = newDisputeWindow;
         emit DefaultsUpdated(newDefaultFeeBps, newDisputeWindow);
     }
-
-    /*//////////////////////////////////////////////////////////////
-                              MARKET CREATION
-    //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IPredictionMarketFactory
     function createMarket(
@@ -176,10 +152,8 @@ contract PredictionMarketFactory is
         marketId = _nextId($);
         PredictionMarket.InitParams memory params = _buildParams($, marketId, questionId, oracleThreshold, tradingEndsAt, feeBpsOverride);
 
-        // ─── Effects (id reservation) before external CREATE ──────
         _reserveId($, marketId);
 
-        // ─── Interaction: CREATE the market ───────────────────────
         market = address(new PredictionMarket(params));
         _bindMarket($, marketId, market);
 
@@ -198,16 +172,13 @@ contract PredictionMarketFactory is
         marketId = _nextId($);
         PredictionMarket.InitParams memory params = _buildParams($, marketId, questionId, oracleThreshold, tradingEndsAt, feeBpsOverride);
 
-        // ─── Pre-compute the address & assert there's no collision ─
         bytes memory initCode = abi.encodePacked(type(PredictionMarket).creationCode, abi.encode(params));
         bytes32 initCodeHash = keccak256(initCode);
         address predicted = _predictCreate2(salt, initCodeHash);
         if (predicted.code.length != 0) revert MarketAlreadyDeployed(predicted);
 
-        // ─── Effects ──────────────────────────────────────────────
         _reserveId($, marketId);
 
-        // ─── Interaction: CREATE2 via assembly ────────────────────
         address deployed;
         assembly {
             deployed := create2(0, add(initCode, 0x20), mload(initCode), salt)
@@ -220,10 +191,6 @@ contract PredictionMarketFactory is
 
         emit MarketCreated(marketId, market, questionId, tradingEndsAt, params.feeBps, true);
     }
-
-    /*//////////////////////////////////////////////////////////////
-                          INTERNAL HELPERS
-    //////////////////////////////////////////////////////////////*/
 
     function _nextId(FactoryStorage storage $) internal view returns (uint64) {
         return $.nextMarketId;
@@ -238,9 +205,6 @@ contract PredictionMarketFactory is
     function _bindMarket(FactoryStorage storage $, uint64 marketId, address market) internal {
         $.marketById[marketId] = market;
         $.idByMarket[market] = marketId;
-        // Tell the singleton ERC-1155 that this address now owns the
-        // YES/NO ids for this marketId. The factory must hold the
-        // ERC-1155's `FACTORY_ROLE`; this is configured at deploy time.
         IOutcomeToken1155($.outcomeToken).registerMarket(marketId, market);
     }
 
@@ -287,10 +251,6 @@ contract PredictionMarketFactory is
         return _factoryStorage().protocolAdmin;
     }
 
-    /*//////////////////////////////////////////////////////////////
-                          ADDRESS PREDICTION
-    //////////////////////////////////////////////////////////////*/
-
     /// @inheritdoc IPredictionMarketFactory
     /// @dev Inline Yul implementation. Benchmarked in
     ///      `test/gas/PredictMarketAddress.t.sol` (W7).
@@ -329,19 +289,14 @@ contract PredictionMarketFactory is
         assembly {
             let p := mload(0x40)
             mstore8(p, 0xff)
-            mstore(add(p, 0x01), shl(96, address()))    // factory address, left-aligned in a word
+            mstore(add(p, 0x01), shl(96, address()))
             mstore(add(p, 0x15), salt)
             mstore(add(p, 0x35), initCodeHash)
             let digest := keccak256(p, 0x55)
             predicted := and(digest, 0xffffffffffffffffffffffffffffffffffffffff)
-            // Bump free memory pointer past the 96-byte scratch we wrote.
             mstore(0x40, add(p, 0x60))
         }
     }
-
-    /*//////////////////////////////////////////////////////////////
-                                  VIEWS
-    //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IPredictionMarketFactory
     function marketById(uint64 id) external view returns (address) {

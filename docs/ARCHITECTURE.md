@@ -258,6 +258,129 @@ at fixed slots — the `_authorizeUpgrade` check + namespaced storage make
 V1 → V2 upgrades collision-proof. The V1 → V2 path is documented in ADR-002
 (`docs/adr/ADR-002-uups-target-selection.md`).
 
+#### Storage-collision proof for V1 → V2 upgrades
+
+The ERC-7201 namespace slot is derived deterministically from the string
+`"prediction.market.factory.main"`. Slither, manual audit, and the
+`script/StorageSlot.s.sol` derivation script all produce the same hex:
+
+```
+keccak256(abi.encode(uint256(keccak256("prediction.market.factory.main")) - 1)) & ~bytes32(uint256(0xff))
+  = 0x8a6eeb15c0a4f6f1bc393fbd6de59958b6281e71cb4379c188e2764f21c90200
+```
+
+V2 of the factory **must** keep its `FactoryStorage` struct as a strict
+superset of V1: append-only fields after the last V1 field, never reorder
+or delete. New unrelated state in V2 lives under a *new* namespace
+(`erc7201:prediction.market.factory.v2`), giving us two non-overlapping
+slot regions. The `_authorizeUpgrade` hook is `onlyRole(DEFAULT_ADMIN_ROLE)`,
+which only the Timelock holds → unauthorised upgrades revert at the proxy
+layer.
+
+### 5.3 `OutcomeToken1155` (singleton ERC-1155, non-upgradeable)
+
+| Slot | Field                | Type                                | Notes                       |
+|------|----------------------|-------------------------------------|-----------------------------|
+| 0    | `_balances`          | mapping(uint256 ⇒ mapping(address ⇒ uint256)) | inherited from OZ ERC-1155 |
+| 1    | `_operatorApprovals` | mapping(address ⇒ mapping(address ⇒ bool))    |                            |
+| 2    | `_uri`               | string                              | base URI                    |
+| 3    | `_roles`             | mapping(bytes32 ⇒ RoleData)         | from AccessControl          |
+| 4    | `_marketOfId`        | mapping(uint256 ⇒ address)          | id ⇒ authorised market      |
+| 5    | `_registered`        | mapping(uint64 ⇒ bool)              | marketId ⇒ registered flag  |
+
+ID derivation is pure (no state): `yesIdOf(m) = m * 2`, `noIdOf(m) = m * 2 + 1`.
+
+### 5.4 `OracleAdapter` (non-upgradeable, AccessControl-gated)
+
+| Slot | Field        | Type                          | Notes                                 |
+|------|--------------|-------------------------------|---------------------------------------|
+| 0    | `_roles`     | mapping(bytes32 ⇒ RoleData)   | from AccessControl                    |
+| 1    | `_feeds`     | mapping(bytes32 ⇒ FeedConfig) | questionId ⇒ (feed, staleness, window, registered) |
+
+`FeedConfig` is packed into a single slot: `address feed` (20 bytes) +
+`uint32 staleness` (4 bytes) + `uint32 disputeWindow` (4 bytes) + `bool
+registered` (1 byte) = 29 bytes, fits in a 32-byte slot.
+
+### 5.5 `FeeVault4626` (non-upgradeable, ERC-4626)
+
+| Slot | Field                | Type                              | Notes                          |
+|------|----------------------|-----------------------------------|--------------------------------|
+| 0–3  | ERC-20 base state    | balances/allowances/totalSupply/name | from OZ ERC-20              |
+| 4    | `_paused`            | bool                              | Pausable                       |
+| 5    | `_status`            | uint256                           | ReentrancyGuard                |
+| 6    | `_roles`             | mapping                           | AccessControl                  |
+| 7    | `_asset`             | IERC20                            | from ERC4626 (immutable, slot reserved by OZ pattern) |
+| 8    | `_underlyingDecimals`| uint8                             | from ERC4626                   |
+
+`_decimalsOffset()` returns 1 (constant) so the inflation-attack surface
+is one decimal beyond the asset's. Pure function, no storage.
+
+### 5.6 `GovernanceToken` (non-upgradeable, ERC20 + ERC20Votes + ERC20Permit)
+
+| Slot | Field                | Type                              | Notes                          |
+|------|----------------------|-----------------------------------|--------------------------------|
+| 0    | `_balances`          | mapping(address ⇒ uint256)        | ERC-20                         |
+| 1    | `_allowances`        | mapping(address ⇒ mapping)        | ERC-20                         |
+| 2    | `_totalSupply`       | uint256                           | ERC-20                         |
+| 3    | `_name`              | string                            |                                |
+| 4    | `_symbol`            | string                            |                                |
+| 5    | `_nameHash`          | bytes32                           | EIP-712 / ERC-20Permit         |
+| 6    | `_versionHash`       | bytes32                           | EIP-712                        |
+| 7    | `_nonces`            | mapping(address ⇒ Counters.Counter)| Nonces                        |
+| 8    | `_delegation`        | mapping(address ⇒ address)        | ERC-20Votes                    |
+| 9    | `_delegateCheckpoints`| mapping(address ⇒ Checkpoints.Trace224) | ERC-20Votes              |
+| 10   | `_totalSupplyCheckpoints` | Checkpoints.Trace224         | ERC-20Votes                    |
+| 11   | `_roles`             | mapping                           | AccessControl                  |
+| —    | `CAP`                | uint256                           | constant — no slot             |
+
+Clock mode is `timestamp` (override of OZ defaults) — checkpoints are
+keyed by `uint48 timestamp`. This is required for Arbitrum where L2
+block times are variable.
+
+### 5.7 `PredictionTimelock` (non-upgradeable, OZ TimelockController)
+
+Inherits OZ `TimelockController` directly. Storage layout is **exactly**
+OZ's, no additions:
+
+| Slot | Field             | Type                          | Notes                                |
+|------|-------------------|-------------------------------|--------------------------------------|
+| 0    | `_roles`          | mapping(bytes32 ⇒ RoleData)   | AccessControl                        |
+| 1    | `_timestamps`     | mapping(bytes32 ⇒ uint256)    | operation id ⇒ scheduled ETA         |
+| 2    | `_minDelay`       | uint256                       | set to 2 days in constructor         |
+
+`PROPOSER_ROLE` holder = Governor.
+`EXECUTOR_ROLE` holder = `address(0)` (open execution).
+`DEFAULT_ADMIN_ROLE` holder = none (deployer renounces at deploy time;
+asserted by `Verify.s.sol`).
+
+### 5.8 `PredictionGovernor` (non-upgradeable, OZ Governor stack)
+
+Inherits the OZ Governor diamond:
+
+```
+Governor
+  ↳ GovernorSettings           (votingDelay, votingPeriod, proposalThreshold storage)
+  ↳ GovernorCountingSimple     (per-proposal vote tallies)
+  ↳ GovernorVotes              (token reference)
+  ↳ GovernorVotesQuorumFraction (quorum numerator)
+  ↳ GovernorTimelockControl    (timelock reference)
+```
+
+Each extension adds a couple of slots; OZ's `__gap` arrays preserve
+forward compatibility, but **we never upgrade the Governor** (it's
+deployed once and is not behind a proxy). Storage collisions are
+therefore not a concern.
+
+Key constants:
+
+| Constant            | Value                  | Source                          |
+|---------------------|------------------------|---------------------------------|
+| `votingDelay`       | `1 days`               | GovernorSettings                |
+| `votingPeriod`      | `1 weeks`              | GovernorSettings                |
+| `proposalThreshold` | 1% of totalSupply      | overridden, dynamic             |
+| `quorum`            | 4% of `getPastTotalSupply` | GovernorVotesQuorumFraction |
+| Clock mode          | `timestamp`            | inherited from `GovernanceToken` |
+
 ## 6. Trust assumptions
 
 - **Timelock is honest.** The 2-day delay gives token-holders a chance to
@@ -273,6 +396,54 @@ V1 → V2 upgrades collision-proof. The V1 → V2 path is documented in ADR-002
 - **No EOA admin remains after deploy.** The post-deploy verification
   script (`script/Verify.s.sol`, W10) asserts this and is shipped as part
   of the submission.
+
+### 6.1 Power matrix (who can do what)
+
+| Role / actor                        | Powers                                                            | If compromised                                                   |
+|-------------------------------------|-------------------------------------------------------------------|------------------------------------------------------------------|
+| `DEFAULT_ADMIN_ROLE` on every contract | Grant/revoke other roles                                          | Held by Timelock → 2-day delay before any malicious grant lands. |
+| `PROPOSER_ROLE` on Timelock         | Queue any operation                                               | Held by Governor only; requires successful proposal first.       |
+| `EXECUTOR_ROLE` on Timelock         | Execute queued operation (anyone)                                 | `address(0)` — by design open. Cannot execute non-queued ops.    |
+| `CANCELLER_ROLE` on Timelock        | Cancel queued operation                                           | Held by Governor → vetoed proposals can be cancelled.            |
+| `KEEPER_ROLE` on each Market        | Call `lockMarket`, `reportOutcome`, `finalize`                    | Compromise = market lifecycle can be triggered early/late; **cannot extract value** because reserves are only released via `claimWinnings` / `removeLiquidity` whose owner is the user. |
+| `PAUSER_ROLE` on Market + Vault     | `pause()` / `unpause()`                                           | Held by Timelock; worst case is a DoS that takes 2 days to recover (immediate `unpause` proposal). |
+| `MARKET_MINTER` (per-id, OutcomeToken)| Mint/burn that specific id                                       | One id = one market; cross-market damage impossible by construction. |
+| `FACTORY_ROLE` on OutcomeToken      | Call `registerMarket`                                             | Held by the factory proxy; registration is one-shot (`registered[mid]` flag).|
+| `MINTER_ROLE` on GovernanceToken    | Mint up to CAP                                                    | Held by Timelock; deployer renounces at end of deploy.           |
+| Deployer EOA                        | None at steady state — renounces all roles in `Deploy.s.sol` step | n/a — verified by `Verify.s.sol`.                                |
+
+### 6.2 What happens if the team multisig is compromised
+
+There is **no team multisig** with privileged access in production. All
+roles are held by the Timelock, which is in turn driven exclusively by
+the on-chain Governor. The only off-chain artefact that matters for
+ongoing security is the **Chainlink feed registration** — and that too
+is gated behind a Governor proposal (`OracleAdapter.updateFeed`).
+
+If the team's GitHub or development-environment is compromised, the
+attacker can:
+
+* Push a malicious commit and propose its bytecode as an upgrade — the
+  Governor (token-holders) still has to vote yes, and even after
+  passing, the Timelock holds the operation for 2 days. Token-holders
+  can exit or fork in that window.
+* Tamper with the subgraph / frontend — only affects the read path;
+  on-chain state is unchanged. Users can always interact with the
+  contracts directly via Arbiscan.
+
+### 6.3 What happens if Chainlink stalls or depegs
+
+* **Stale price** → `OracleAdapter.latestSafePrice` reverts → `reportOutcome`
+  reverts → market stays in `Locked` state until either (a) feed
+  recovers, or (b) governance invalidates the market via `setInvalid`,
+  refunding complete sets 1:1.
+* **Manipulated price within the staleness window** → market reports a
+  wrong outcome → governance can `disputeOutcome` within the dispute
+  window (default 24 h) → on `resolveDispute` the Timelock writes the
+  correct outcome.
+* **Feed registry tampering** → blocked by `onlyRole(DEFAULT_ADMIN_ROLE)`
+  on `registerFeed`/`updateFeed` → requires governance proposal +
+  2-day Timelock delay.
 
 ## 7. Design patterns in use (≥5 required)
 

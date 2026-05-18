@@ -30,25 +30,18 @@ import {IOracleAdapter} from "./IOracleAdapter.sol";
 /// held by the protocol Timelock. Keepers hold `KEEPER_ROLE` and can
 /// only drive the state machine forward — they cannot withdraw value.
 interface IPredictionMarket {
-    /*//////////////////////////////////////////////////////////////
-                                 ENUMS
-    //////////////////////////////////////////////////////////////*/
 
     /// @notice Lifecycle states. Transitions are strictly one-way except
     ///         `Reported → Disputed` and `Disputed → Reported` (during
     ///         governance review).
     enum Status {
-        Open,       // 0 — trading + LP open
-        Locked,     // 1 — trading closed, awaiting resolution
-        Reported,   // 2 — outcome reported by oracle, dispute window open
-        Disputed,   // 3 — governance is reviewing the report
-        Finalized,  // 4 — outcome locked in, winners may `claimWinnings`
-        Invalid     // 5 — market voided; complete sets refunded 1:1
+        Open,
+        Locked,
+        Reported,
+        Disputed,
+        Finalized,
+        Invalid
     }
-
-    /*//////////////////////////////////////////////////////////////
-                                 ERRORS
-    //////////////////////////////////////////////////////////////*/
 
     error InvalidState(Status current, Status required);
     error DeadlineExpired(uint256 nowTs, uint256 deadline);
@@ -63,10 +56,6 @@ interface IPredictionMarket {
     error DisputeWindowOver(uint256 nowTs, uint256 endsAt);
     error NothingToClaim();
     error KInvariantBroken(uint256 kBefore, uint256 kAfter);
-
-    /*//////////////////////////////////////////////////////////////
-                                 EVENTS
-    //////////////////////////////////////////////////////////////*/
 
     event LiquidityAdded(
         address indexed provider,
@@ -102,10 +91,6 @@ interface IPredictionMarket {
     event MarketFinalized(uint8 indexed winningOutcome);
     event MarketInvalidated(address indexed by, string reason);
     event WinningsClaimed(address indexed user, uint256 sharesBurnt, uint256 collateralOut);
-
-    /*//////////////////////////////////////////////////////////////
-                              AMM ACTIONS
-    //////////////////////////////////////////////////////////////*/
 
     /// @notice Deposit `collateralIn` collateral, mint equal YES + NO,
     ///         add them to reserves at the current pool ratio, mint LP
@@ -146,10 +131,6 @@ interface IPredictionMarket {
     ///         back `amount` collateral.
     function redeemCompleteSets(uint256 amount) external;
 
-    /*//////////////////////////////////////////////////////////////
-                            STATE TRANSITIONS
-    //////////////////////////////////////////////////////////////*/
-
     /// @notice Anyone may call after `tradingEndsAt`. Transitions Open → Locked.
     function lockMarket() external;
 
@@ -168,18 +149,10 @@ interface IPredictionMarket {
     /// @notice Void the market (refunds complete sets 1:1). Admin-gated.
     function setInvalid(string calldata reason) external;
 
-    /*//////////////////////////////////////////////////////////////
-                          PULL-OVER-PUSH CLAIM
-    //////////////////////////////////////////////////////////////*/
-
     /// @notice Burn the caller's winning shares, send 1:1 collateral.
     ///         Available only in `Finalized` state. Each share of the
     ///         winning outcome redeems for 1 unit of collateral.
     function claimWinnings() external returns (uint256 collateralOut);
-
-    /*//////////////////////////////////////////////////////////////
-                                  VIEWS
-    //////////////////////////////////////////////////////////////*/
 
     function reserves() external view returns (uint128 reserveYes, uint128 reserveNo);
     function status() external view returns (Status);

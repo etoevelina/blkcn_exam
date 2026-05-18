@@ -38,14 +38,12 @@ contract Verify is Script {
         require(governor     != address(0), "governor not deployed");
         require(govToken     != address(0), "governanceToken not deployed");
 
-        // ─── Access-control / ownership ──────────────────────────
         _checkAdmin(outcomeToken, timelock, deployer, "OutcomeToken1155");
         _checkAdmin(factory,      timelock, deployer, "PredictionMarketFactory");
         _checkAdmin(oracle,       timelock, deployer, "OracleAdapter");
         _checkAdmin(vault,        timelock, deployer, "FeeVault4626");
         _checkAdmin(govToken,     timelock, deployer, "GovernanceToken");
 
-        // Factory ↔ OutcomeToken wiring
         require(
             IAccessControl(outcomeToken).hasRole(
                 OutcomeToken1155(outcomeToken).FACTORY_ROLE(), factory
@@ -54,7 +52,6 @@ contract Verify is Script {
         );
         console2.log("OK   OutcomeToken1155 -> factory wiring");
 
-        // ─── Timelock parameters ─────────────────────────────────
         PredictionTimelock tl = PredictionTimelock(payable(timelock));
         require(tl.getMinDelay() == 2 days, "timelock delay != 2 days");
         console2.log("OK   Timelock delay == 2 days");
@@ -66,19 +63,16 @@ contract Verify is Script {
         require(tl.hasRole(tl.EXECUTOR_ROLE(), address(0)), "executor != address(0)");
         console2.log("OK   Timelock open execution (executor == address(0))");
 
-        // ─── Governor parameters ─────────────────────────────────
         PredictionGovernor gv = PredictionGovernor(payable(governor));
         require(gv.votingDelay()  == 1 days,  "votingDelay != 1 day");
         require(gv.votingPeriod() == 1 weeks, "votingPeriod != 1 week");
         require(gv.quorumNumerator() == 4,    "quorum fraction != 4%");
         console2.log("OK   Governor 1d / 1w / 4% quorum");
 
-        // proposalThreshold = 1% of supply (snapshot at clock()-1).
         uint256 supply = GovernanceToken(govToken).totalSupply();
         require(gv.proposalThreshold() == supply / 100, "proposalThreshold != 1% of supply");
         console2.log("OK   Governor proposalThreshold == 1%% of supply");
 
-        // ─── No backdoor ─────────────────────────────────────────
         require(!tl.hasRole(0x00, deployer), "deployer still has TIMELOCK admin");
         console2.log("OK   No EOA backdoor on Timelock");
 

@@ -8,22 +8,21 @@ import {TimelockController} from "@openzeppelin/contracts/governance/TimelockCon
 /// @notice
 /// Constructor wires the standard OZ TimelockController with:
 ///   * minDelay = 2 days (spec §3.1 Governance)
-///   * proposers = [governor]
+///   * proposers = [initialProposer]  (deployer briefly; Governor takes over)
 ///   * executors = [address(0)] (open execution after the delay)
-///   * admin    = address(0) (no admin EOA — Timelock is its own admin
-///                            via the role-grant logic the OZ contract
-///                            performs internally)
+///   * admin    = initialAdmin (deployer briefly; renounces post-wiring)
 ///
-/// We deliberately pass `address(0)` as the admin so there is no
-/// `TIMELOCK_ADMIN_ROLE`-holder outside the Timelock itself. This
-/// matches the spec's "no admin backdoor remains" guarantee.
+/// `Verify.s.sol` asserts that the deployer has renounced both PROPOSER
+/// and DEFAULT_ADMIN at steady-state, so the Timelock has no EOA
+/// backdoor in production. The temporary admin is required only to
+/// grant the Governor `PROPOSER_ROLE` at deploy time.
 contract PredictionTimelock is TimelockController {
-    constructor(address governor)
+    constructor(address initialProposer, address initialAdmin)
         TimelockController(
             2 days,
-            _singleton(governor),
+            _singleton(initialProposer),
             _openExecutors(),
-            address(0)
+            initialAdmin
         )
     {}
 

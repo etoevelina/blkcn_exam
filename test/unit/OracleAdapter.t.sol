@@ -43,7 +43,6 @@ contract OracleAdapterTest is Fixture {
         vm.prank(admin);
         oracle.registerFeed(Q, address(feed), 30, 1 days);
 
-        // Advance well past staleness without touching the feed.
         vm.warp(block.timestamp + 31);
         vm.expectRevert();
         oracle.latestSafePrice(Q);
@@ -64,14 +63,14 @@ contract OracleAdapterTest is Fixture {
         vm.prank(admin);
         oracle.registerFeed(Q, address(feed), 1 hours, 1 days);
         feed.setPrice(101_000e8);
-        assertEq(oracle.resolveBinary(Q, 100_000e8), 0);    // YES
+        assertEq(oracle.resolveBinary(Q, 100_000e8), 0);
     }
 
     function test_resolveBinary_returnsOneWhenPriceBelowThreshold() public {
         vm.prank(admin);
         oracle.registerFeed(Q, address(feed), 1 hours, 1 days);
         feed.setPrice(99_000e8);
-        assertEq(oracle.resolveBinary(Q, 100_000e8), 1);    // NO
+        assertEq(oracle.resolveBinary(Q, 100_000e8), 1);
     }
 
     function test_updateFeed_changesParameters() public {
@@ -94,7 +93,7 @@ contract OracleAdapterTest is Fixture {
     function test_updateFeed_revertsOnZeroValues() public {
         vm.startPrank(admin);
         oracle.registerFeed(Q, address(feed), 1 hours, 1 days);
-        vm.expectRevert();   // UnknownFeed (used as ZeroParam sentinel)
+        vm.expectRevert();
         oracle.updateFeed(Q, address(0), 1 hours, 1 days);
         vm.expectRevert();
         oracle.updateFeed(Q, address(feed), 0, 1 days);
@@ -105,7 +104,7 @@ contract OracleAdapterTest is Fixture {
 
     function test_updateFeed_revertsForUnknownQuestion() public {
         vm.prank(admin);
-        vm.expectRevert();   // UnknownFeed
+        vm.expectRevert();
         oracle.updateFeed(bytes32("never-registered"), address(feed), 1 hours, 1 days);
     }
 

@@ -1,16 +1,5 @@
 "use client";
 
-// Write #1 — Swap YES ⇄ NO via PredictionMarket.swap.
-//
-// Pre-flight:
-//   * read pool reserves + market.yesId / market.noId
-//   * read user's OutcomeToken1155 balance of `outcomeIn`
-//   * compute `amountOut` locally via market.getAmountOut (server math)
-//
-// Submit:
-//   1. ensure ERC-1155 setApprovalForAll(market, true) — one-time
-//   2. call market.swap(...) with slippage-protected `minOut`
-
 import { useMemo, useState } from "react";
 import type { Address, Hash } from "viem";
 import { parseUnits } from "viem";
@@ -24,7 +13,7 @@ interface Props {
   market: Address;
 }
 
-const DEFAULT_SLIPPAGE_BPS = 50n;       // 0.5%
+const DEFAULT_SLIPPAGE_BPS = 50n;
 const BPS = 10_000n;
 
 export function SwapForm({ market }: Props) {
@@ -33,7 +22,6 @@ export function SwapForm({ market }: Props) {
   const [amountInRaw, setAmountInRaw] = useState("");
   const [slippageBps, setSlippageBps] = useState<bigint>(DEFAULT_SLIPPAGE_BPS);
 
-  /* ─── Reads ──────────────────────────────────────────────────────── */
   const marketReads = useReadContracts({
     allowFailure: false,
     contracts: [
@@ -84,7 +72,6 @@ export function SwapForm({ market }: Props) {
     query: { enabled: Boolean(user) },
   });
 
-  /* ─── Writes ─────────────────────────────────────────────────────── */
   const { writeContractAsync, data: hash, error } = useWriteContract();
 
   const submitApprove = async (): Promise<Hash | undefined> => {
@@ -97,7 +84,7 @@ export function SwapForm({ market }: Props) {
   };
 
   const submitSwap = async (): Promise<Hash | undefined> => {
-    const deadline = BigInt(Math.floor(Date.now() / 1000) + 600); // +10 min
+    const deadline = BigInt(Math.floor(Date.now() / 1000) + 600);
     return writeContractAsync({
       address: market,
       abi: marketAbi,
@@ -106,7 +93,6 @@ export function SwapForm({ market }: Props) {
     });
   };
 
-  /* ─── Render ─────────────────────────────────────────────────────── */
   const ready = amountIn > 0n && (amountOut ?? 0n) > 0n && isApproved && user;
 
   return (

@@ -1,9 +1,3 @@
-// =============================================================================
-// Const-asserted ABI fragments so viem can infer parameter / return types.
-// Each ABI lists ONLY the entry points the dApp actually calls — full
-// JSON ABIs from forge live in subgraph/abis/ and are not duplicated.
-// =============================================================================
-
 export const erc20Abi = [
   { type: "function", name: "approve",   stateMutability: "nonpayable", inputs: [{ type: "address" }, { type: "uint256" }], outputs: [{ type: "bool" }] },
   { type: "function", name: "allowance", stateMutability: "view",       inputs: [{ type: "address" }, { type: "address" }], outputs: [{ type: "uint256" }] },
@@ -19,7 +13,6 @@ export const outcomeTokenAbi = [
 ] as const;
 
 export const marketAbi = [
-  // ── reads ──
   { type: "function", name: "reserves",          stateMutability: "view", inputs: [], outputs: [{ name: "reserveYes", type: "uint128" }, { name: "reserveNo", type: "uint128" }] },
   { type: "function", name: "status",            stateMutability: "view", inputs: [], outputs: [{ type: "uint8" }] },
   { type: "function", name: "yesId",             stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
@@ -31,7 +24,6 @@ export const marketAbi = [
   { type: "function", name: "totalSupply",       stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
   { type: "function", name: "balanceOf",         stateMutability: "view", inputs: [{ type: "address" }], outputs: [{ type: "uint256" }] },
   { type: "function", name: "getAmountOut",      stateMutability: "view", inputs: [{ type: "uint256" }, { type: "uint256" }, { type: "uint256" }], outputs: [{ type: "uint256" }] },
-  // ── writes ──
   {
     type: "function", name: "addLiquidity", stateMutability: "nonpayable",
     inputs: [{ name: "collateralIn", type: "uint256" }, { name: "minLpOut", type: "uint256" }, { name: "deadline", type: "uint256" }],
@@ -59,7 +51,6 @@ export const governorAbi = [
   { type: "function", name: "proposalThreshold",stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
   { type: "function", name: "quorum",           stateMutability: "view", inputs: [{ type: "uint256" }], outputs: [{ type: "uint256" }] },
   { type: "function", name: "proposalEta",      stateMutability: "view", inputs: [{ type: "uint256" }], outputs: [{ type: "uint256" }] },
-  // ── writes ──
   {
     type: "function", name: "castVoteWithReason", stateMutability: "nonpayable",
     inputs: [{ name: "proposalId", type: "uint256" }, { name: "support", type: "uint8" }, { name: "reason", type: "string" }],

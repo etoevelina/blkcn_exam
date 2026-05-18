@@ -36,8 +36,8 @@ interface IAggregatorV3 {
 contract OracleAdapter is AccessControl, IOracleAdapter {
     struct FeedConfig {
         address feed;
-        uint32 staleness;       // seconds
-        uint32 disputeWindow;   // seconds
+        uint32 staleness;
+        uint32 disputeWindow;
         bool registered;
     }
 
@@ -47,10 +47,6 @@ contract OracleAdapter is AccessControl, IOracleAdapter {
         if (admin == address(0)) revert UnknownFeed(bytes32(0));
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
     }
-
-    /*//////////////////////////////////////////////////////////////
-                          ADMIN — FEED REGISTRATION
-    //////////////////////////////////////////////////////////////*/
 
     function registerFeed(
         bytes32 questionId,
@@ -86,10 +82,6 @@ contract OracleAdapter is AccessControl, IOracleAdapter {
         emit FeedUpdated(questionId, feed, staleness, disputeWindow_);
     }
 
-    /*//////////////////////////////////////////////////////////////
-                               READ-ONLY API
-    //////////////////////////////////////////////////////////////*/
-
     /// @inheritdoc IOracleAdapter
     function latestSafePrice(bytes32 questionId)
         public
@@ -99,10 +91,6 @@ contract OracleAdapter is AccessControl, IOracleAdapter {
         FeedConfig memory cfg = _feeds[questionId];
         if (!cfg.registered) revert UnknownFeed(questionId);
 
-        // We deliberately ignore `startedAt` — staleness is enforced via
-        // `updatedAt` + the configured threshold, and `answeredInRound`
-        // already guards against in-progress / pending rounds.
-        // slither-disable-next-line unused-return
         (uint80 roundId, int256 answer, , uint256 ts, uint80 answeredInRound) =
             IAggregatorV3(cfg.feed).latestRoundData();
 
@@ -110,8 +98,6 @@ contract OracleAdapter is AccessControl, IOracleAdapter {
         if (answeredInRound < roundId) revert StalePrice(ts, cfg.staleness);
         if (ts == 0) revert StalePrice(0, cfg.staleness);
 
-        // Strict-less-than: a feed updated exactly `staleness` seconds ago
-        // is still considered fresh; one second later it isn't.
         if (block.timestamp > ts + cfg.staleness) revert StalePrice(ts, cfg.staleness);
 
         return (answer, ts);
@@ -120,7 +106,6 @@ contract OracleAdapter is AccessControl, IOracleAdapter {
     /// @inheritdoc IOracleAdapter
     function resolveBinary(bytes32 questionId, int256 threshold) external view returns (uint8 outcome) {
         (int256 price, ) = latestSafePrice(questionId);
-        // outcome = 0 (YES) iff price >= threshold; else 1 (NO).
         outcome = price >= threshold ? 0 : 1;
     }
 

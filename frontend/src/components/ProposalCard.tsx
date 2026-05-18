@@ -10,7 +10,7 @@ import { addresses } from "@/lib/addresses";
 import type { ProposalState } from "@/hooks/useProposalState";
 
 export interface ProposalSummary {
-  id: string;                // proposalId hex
+  id: string;
   proposer: string;
   description: string;
   forVotes: string;
@@ -39,7 +39,7 @@ interface Props {
 }
 
 export function ProposalCard({ p, state }: Props) {
-  const [support, setSupport] = useState<0 | 1 | 2>(1);  // default For
+  const [support, setSupport] = useState<0 | 1 | 2>(1);
   const [reason, setReason] = useState("");
   const { writeContractAsync, data: hash, error } = useWriteContract();
 

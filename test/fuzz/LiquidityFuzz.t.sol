@@ -20,8 +20,6 @@ contract LiquidityFuzz is Fixture {
         (uint256 yesOut, uint256 noOut) =
             market.removeLiquidity(lp, 0, 0, block.timestamp + 1 hours);
 
-        // We can never get more YES+NO than we put in (some is forever locked
-        // in MIN_LIQUIDITY tokens held by the burn address).
         assertLe(yesOut, uint256(amount));
         assertLe(noOut, uint256(amount));
     }

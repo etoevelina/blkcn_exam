@@ -16,7 +16,6 @@ contract GovernanceFuzz is Fixture {
         vm.prank(alice);
         gov.delegate(alice);
 
-        // Snapshot only sticks at the next clock tick.
         vm.warp(block.timestamp + 1);
         assertEq(gov.getVotes(alice), amount, "votes != balance after self-delegate");
     }

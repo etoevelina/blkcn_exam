@@ -1,15 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.26;
 
-import {ERC4626} from "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {ERC4626} from "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 /// @title FeeVault4626 — ERC-4626 fee receiver for LPs
 /// @author Evelina (core)
@@ -33,7 +31,6 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 /// price meaningfully on a fresh vault.
 contract FeeVault4626 is ERC4626, AccessControl, Pausable, ReentrancyGuard {
     using SafeERC20 for IERC20;
-    using Math for uint256;
 
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
 
@@ -54,10 +51,6 @@ contract FeeVault4626 is ERC4626, AccessControl, Pausable, ReentrancyGuard {
 
     error ERC4626ZeroAdmin();
 
-    /*//////////////////////////////////////////////////////////////
-                              PAUSE GUARDS
-    //////////////////////////////////////////////////////////////*/
-
     function pause() external onlyRole(PAUSER_ROLE) {
         _pause();
     }
@@ -66,10 +59,6 @@ contract FeeVault4626 is ERC4626, AccessControl, Pausable, ReentrancyGuard {
         _unpause();
     }
 
-    /*//////////////////////////////////////////////////////////////
-                              FEES IN-PUSH
-    //////////////////////////////////////////////////////////////*/
-
     /// @notice Markets call this to push protocol-fee dust into the vault.
     ///         Emits an event so the subgraph can credit LPs analytically.
     function receiveFees(uint256 amount) external nonReentrant {
@@ -77,10 +66,6 @@ contract FeeVault4626 is ERC4626, AccessControl, Pausable, ReentrancyGuard {
         IERC20(asset()).safeTransferFrom(msg.sender, address(this), amount);
         emit FeesReceived(msg.sender, amount, totalAssets());
     }
-
-    /*//////////////////////////////////////////////////////////////
-                              ERC-4626 HOOKS
-    //////////////////////////////////////////////////////////////*/
 
     /// @dev Reentrancy + pause guarded deposit/mint/withdraw/redeem path.
     function deposit(uint256 assets, address receiver) public override nonReentrant whenNotPaused returns (uint256) {
@@ -114,7 +99,4 @@ contract FeeVault4626 is ERC4626, AccessControl, Pausable, ReentrancyGuard {
         return DECIMALS_OFFSET;
     }
 
-    function decimals() public view virtual override(ERC4626, ERC20, IERC20Metadata) returns (uint8) {
-        return ERC4626.decimals();
-    }
 }

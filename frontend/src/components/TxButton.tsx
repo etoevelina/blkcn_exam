@@ -44,12 +44,10 @@ export function TxButton({
     error: receiptError,
   } = useWaitForTransactionReceipt({ hash });
 
-  // Toast feedback on submit error.
   useEffect(() => {
     if (error) toast.error(toReadableError(error));
   }, [error]);
 
-  // Toast feedback when the tx finishes.
   useEffect(() => {
     if (!hash) return;
     if (isSuccess) {
@@ -79,9 +77,6 @@ export function TxButton({
     try {
       await onSubmit();
     } catch (e) {
-      // useWriteContract already exposes the error via the `error` prop,
-      // but the throw from `writeContractAsync` would otherwise be
-      // swallowed — toast it here too as a belt-and-braces.
       toast.error(toReadableError(e));
     }
   };

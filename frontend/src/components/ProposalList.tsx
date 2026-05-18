@@ -43,9 +43,6 @@ export function ProposalList() {
   return (
     <div className="space-y-4">
       {proposals.map((p, idx) => {
-        // Authoritative on-chain state via multicall; falls back to the
-        // subgraph snapshot if the multicall is still pending or the
-        // governor address isn't deployed yet.
         const onChain = states?.[idx];
         const snapshot = PROPOSAL_STATE.includes(p.statusSnapshot as ProposalState)
           ? (p.statusSnapshot as ProposalState)

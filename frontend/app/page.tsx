@@ -1,8 +1,3 @@
-// Server component. Pulls the ActiveMarkets list from the subgraph at
-// request time and renders a grid of market cards. No wagmi reads here;
-// wallet-dependent panels (PortfolioPanel) live deeper in the tree as
-// "use client" components.
-
 import Link from "next/link";
 
 import { subgraphClient } from "@/lib/subgraph";
@@ -24,7 +19,6 @@ interface Market {
 async function fetchMarkets(): Promise<Market[]> {
   const { data, error } = await subgraphClient.query<{ markets: Market[] }>(ACTIVE_MARKETS, {}).toPromise();
   if (error) {
-    // eslint-disable-next-line no-console
     console.error("Subgraph error:", error);
     return [];
   }

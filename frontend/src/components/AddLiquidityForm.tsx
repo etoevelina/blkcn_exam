@@ -1,15 +1,5 @@
 "use client";
 
-// Write #2 — Add liquidity via PredictionMarket.addLiquidity.
-//
-// Pre-flight:
-//   * ensure ERC-20 collateral allowance(user, market) ≥ amount
-//   * read pool reserves to estimate `lpMinted` for the slippage check
-//
-// Submit:
-//   1. (optional) approve collateral
-//   2. addLiquidity(collateralIn, minLpOut, deadline)
-
 import { useMemo, useState } from "react";
 import type { Address, Hash } from "viem";
 import { parseUnits } from "viem";
@@ -23,7 +13,7 @@ interface Props {
   market: Address;
 }
 
-const DEFAULT_SLIPPAGE_BPS = 100n;     // 1%
+const DEFAULT_SLIPPAGE_BPS = 100n;
 const BPS = 10_000n;
 
 export function AddLiquidityForm({ market }: Props) {
@@ -32,10 +22,9 @@ export function AddLiquidityForm({ market }: Props) {
 
   const collateralIn = useMemo(() => {
     if (!collateralRaw) return 0n;
-    try { return parseUnits(collateralRaw, 6); } catch { return 0n; }  // USDC = 6
+    try { return parseUnits(collateralRaw, 6); } catch { return 0n; }
   }, [collateralRaw]);
 
-  /* ── reads ── */
   const { data: allowance, refetch: refetchAllowance } = useReadContract({
     address: addresses.collateralToken,
     abi: erc20Abi,
@@ -71,7 +60,6 @@ export function AddLiquidityForm({ market }: Props) {
   const estimatedLp = useMemo(() => {
     if (collateralIn === 0n) return 0n;
     if (reserveYes === 0n && reserveNo === 0n) {
-      // Initial deposit; lpMinted = C - MIN_LIQUIDITY (1000).
       return collateralIn > 1000n ? collateralIn - 1000n : 0n;
     }
     const supply = (lpSupply as bigint | undefined) ?? 0n;
@@ -87,7 +75,6 @@ export function AddLiquidityForm({ market }: Props) {
     [estimatedLp],
   );
 
-  /* ── writes ── */
   const { writeContractAsync, data: hash, error } = useWriteContract();
 
   const submitApprove = async (): Promise<Hash | undefined> => {

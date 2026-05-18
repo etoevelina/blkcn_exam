@@ -1,15 +1,5 @@
 "use client";
 
-// =============================================================================
-// useProposalState
-//
-// Reads `governor.state(proposalId)` for each provided proposalId via
-// wagmi's multicall under the hood. This is the *authoritative* source of
-// proposal state — the subgraph cache only seeds the list, but a
-// proposal might have crossed e.g. Active → Defeated since the last
-// indexer block.
-// =============================================================================
-
 import { useMemo } from "react";
 import { useReadContracts } from "wagmi";
 

@@ -69,19 +69,11 @@ contract PredictionMarket is
 {
     using SafeERC20 for IERC20;
 
-    /*//////////////////////////////////////////////////////////////
-                                 ROLES
-    //////////////////////////////////////////////////////////////*/
-
     /// @notice Can drive the state machine forward (lock/report/finalize).
     bytes32 public constant KEEPER_ROLE = keccak256("KEEPER_ROLE");
 
     /// @notice Can pause / unpause trading + LP. Held by Timelock.
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
-
-    /*//////////////////////////////////////////////////////////////
-                               CONSTANTS
-    //////////////////////////////////////////////////////////////*/
 
     /// @dev Inflation-attack mitigation: a tiny initial LP supply is
     ///      sent to a burn address on the *first* `addLiquidity` call,
@@ -98,10 +90,6 @@ contract PredictionMarket is
     uint8 public constant OUTCOME_YES = 0;
     uint8 public constant OUTCOME_NO  = 1;
 
-    /*//////////////////////////////////////////////////////////////
-                              IMMUTABLES
-    //////////////////////////////////////////////////////////////*/
-
     IERC20 internal immutable _collateral;
     IOutcomeToken1155 internal immutable _outcome;
     IOracleAdapter internal immutable _oracle;
@@ -113,25 +101,15 @@ contract PredictionMarket is
     uint256 internal immutable _yesId;
     uint256 internal immutable _noId;
 
-    /*//////////////////////////////////////////////////////////////
-                                 STORAGE
-    //////////////////////////////////////////////////////////////*/
-
-    // Slot A: packed reserves (uint128 + uint128 fits in one slot).
     uint128 internal _reserveYes;
     uint128 internal _reserveNo;
 
-    // Slot B: packed status + outcome + windows + fee.
     uint64  internal _tradingEndsAt;
     uint64  internal _disputeEndsAt;
-    uint32  internal _disputeWindow;     // seconds, copied from factory at deploy
-    uint16  internal _feeBps;            // e.g. 30 → 0.3%
-    uint8   internal _statusByte;        // = uint8(Status)
-    uint8   internal _winningOutcome;    // 0=YES, 1=NO, 0xff=unset
-
-    /*//////////////////////////////////////////////////////////////
-                              CONSTRUCTION
-    //////////////////////////////////////////////////////////////*/
+    uint32  internal _disputeWindow;
+    uint16  internal _feeBps;
+    uint8   internal _statusByte;
+    uint8   internal _winningOutcome;
 
     /// @notice Constructor parameter bundle to keep `new` calls readable.
     struct InitParams {
@@ -139,14 +117,14 @@ contract PredictionMarket is
         IOutcomeToken1155 outcomeToken;
         IOracleAdapter oracle;
         address feeVault;
-        address admin;          // Timelock
-        address keeper;         // Initial keeper (can be admin too)
+        address admin;
+        address keeper;
         uint64  marketId;
         bytes32 questionId;
         int256  oracleThreshold;
         uint64  tradingEndsAt;
-        uint16  feeBps;         // basis points (30 = 0.3%)
-        uint32  disputeWindow;  // seconds
+        uint16  feeBps;
+        uint32  disputeWindow;
     }
 
     /// @notice Initialise the market. All parameters are immutable.
@@ -158,7 +136,7 @@ contract PredictionMarket is
         if (p.feeVault == address(0)) revert ZeroAmount();
         if (p.admin == address(0)) revert ZeroAmount();
         if (p.keeper == address(0)) revert ZeroAmount();
-        if (p.feeBps == 0 || p.feeBps > 1_000) revert ZeroAmount();              // 0 < fee ≤ 10%
+        if (p.feeBps == 0 || p.feeBps > 1_000) revert ZeroAmount();
         if (p.disputeWindow == 0) revert ZeroAmount();
         if (p.tradingEndsAt <= block.timestamp) revert TradingNotEnded(block.timestamp, p.tradingEndsAt);
 
@@ -185,10 +163,6 @@ contract PredictionMarket is
         _grantRole(KEEPER_ROLE, p.keeper);
     }
 
-    /*//////////////////////////////////////////////////////////////
-                          STATE MACHINE GUARDS
-    //////////////////////////////////////////////////////////////*/
-
     function _requireStatus(Status required) internal view {
         if (Status(_statusByte) != required) revert InvalidState(Status(_statusByte), required);
     }
@@ -196,10 +170,6 @@ contract PredictionMarket is
     function _requireDeadline(uint256 deadline) internal view {
         if (block.timestamp > deadline) revert DeadlineExpired(block.timestamp, deadline);
     }
-
-    /*//////////////////////////////////////////////////////////////
-                           ADMIN / PAUSE
-    //////////////////////////////////////////////////////////////*/
 
     function pause() external onlyRole(PAUSER_ROLE) {
         _pause();
@@ -209,10 +179,6 @@ contract PredictionMarket is
         _unpause();
     }
 
-    /*//////////////////////////////////////////////////////////////
-                              LIQUIDITY
-    //////////////////////////////////////////////////////////////*/
-
     /// @inheritdoc IPredictionMarket
     function addLiquidity(uint256 collateralIn, uint256 minLpOut, uint256 deadline)
         external
@@ -220,19 +186,16 @@ contract PredictionMarket is
         whenNotPaused
         returns (uint256 lpMinted, uint256 yesLeftover, uint256 noLeftover)
     {
-        // ─── Checks ───────────────────────────────────────────────
         _requireStatus(Status.Open);
         _requireDeadline(deadline);
         if (collateralIn == 0) revert ZeroAmount();
 
-        // ─── Compute ──────────────────────────────────────────────
         uint256 ry = _reserveYes;
         uint256 rn = _reserveNo;
         uint256 yesAdd;
         uint256 noAdd;
 
         if (ry == 0 && rn == 0) {
-            // First-ever liquidity. Use full collateral on both sides.
             yesAdd = collateralIn;
             noAdd  = collateralIn;
             if (collateralIn <= MIN_LIQUIDITY) revert InsufficientLiquidity();
@@ -240,9 +203,6 @@ contract PredictionMarket is
                 lpMinted = collateralIn - MIN_LIQUIDITY;
             }
         } else {
-            // Maintain current pool ratio. Cap by the larger reserve so
-            // that the "scarce" side equals collateralIn and the
-            // "abundant" side is proportional.
             if (ry >= rn) {
                 yesAdd = collateralIn;
                 noAdd  = (collateralIn * rn) / ry;
@@ -251,9 +211,8 @@ contract PredictionMarket is
                 yesAdd = (collateralIn * ry) / rn;
             }
             uint256 supply = totalSupply();
-            // Use the limiting side. (yesAdd / ry) == (noAdd / rn) by construction
-            // when ry == rn; otherwise we use whichever side equals collateralIn.
-            lpMinted = ry >= rn ? (supply * yesAdd) / ry : (supply * noAdd) / rn;
+            uint256 denom = ry >= rn ? ry : rn;
+            lpMinted = (supply * collateralIn) / denom;
         }
 
         if (lpMinted == 0) revert InsufficientLiquidity();
@@ -264,17 +223,14 @@ contract PredictionMarket is
             noLeftover  = collateralIn - noAdd;
         }
 
-        // ─── Effects ──────────────────────────────────────────────
         _reserveYes = uint128(ry + yesAdd);
         _reserveNo  = uint128(rn + noAdd);
 
         if (ry == 0 && rn == 0) {
-            // Burn MIN_LIQUIDITY of LP to address(0xdead) — unrecoverable.
             _mint(address(0xdead), MIN_LIQUIDITY);
         }
         _mint(msg.sender, lpMinted);
 
-        // ─── Interactions ─────────────────────────────────────────
         _collateral.safeTransferFrom(msg.sender, address(this), collateralIn);
         _outcome.mint(address(this), _yesId, collateralIn);
         _outcome.mint(address(this), _noId,  collateralIn);
@@ -295,17 +251,12 @@ contract PredictionMarket is
         nonReentrant
         returns (uint256 yesOut, uint256 noOut)
     {
-        // ─── Checks ───────────────────────────────────────────────
         _requireDeadline(deadline);
         if (lpBurn == 0) revert ZeroAmount();
-        Status s = Status(_statusByte);
-        // Allowed in Open, Locked, Reported, Disputed, Finalized, Invalid.
-        // (Removing liquidity is always permitted; only swap is gated.)
 
         uint256 supply = totalSupply();
         if (supply == 0) revert InsufficientLiquidity();
 
-        // ─── Compute ──────────────────────────────────────────────
         uint256 ry = _reserveYes;
         uint256 rn = _reserveNo;
         yesOut = (ry * lpBurn) / supply;
@@ -315,12 +266,10 @@ contract PredictionMarket is
         if (noOut  < minNoOut)  revert InsufficientOutputAmount(noOut,  minNoOut);
         if (yesOut == 0 && noOut == 0) revert InsufficientLiquidity();
 
-        // ─── Effects ──────────────────────────────────────────────
         _reserveYes = uint128(ry - yesOut);
         _reserveNo  = uint128(rn - noOut);
         _burn(msg.sender, lpBurn);
 
-        // ─── Interactions ─────────────────────────────────────────
         if (yesOut > 0) {
             _outcome.safeTransferFrom(address(this), msg.sender, _yesId, yesOut, "");
         }
@@ -329,16 +278,7 @@ contract PredictionMarket is
         }
 
         emit LiquidityRemoved(msg.sender, lpBurn, yesOut, noOut);
-
-        // Use `s` to suppress the "unused local variable" linter warning
-        // and to make explicit that this function is intentionally allowed
-        // in any status. Audit reference: ADR-001.
-        s;
     }
-
-    /*//////////////////////////////////////////////////////////////
-                                  SWAP
-    //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IPredictionMarket
     function swap(uint256 outcomeIn, uint256 outcomeOut, uint256 amountIn, uint256 minOut, uint256 deadline)
@@ -347,7 +287,6 @@ contract PredictionMarket is
         whenNotPaused
         returns (uint256 amountOut)
     {
-        // ─── Checks ───────────────────────────────────────────────
         _requireStatus(Status.Open);
         _requireDeadline(deadline);
         if (amountIn == 0) revert ZeroAmount();
@@ -359,7 +298,6 @@ contract PredictionMarket is
         uint256 reserveIn  = inIsYes ? _reserveYes : _reserveNo;
         uint256 reserveOut = inIsYes ? _reserveNo  : _reserveYes;
 
-        // ─── Compute ──────────────────────────────────────────────
         amountOut = _getAmountOut(amountIn, reserveIn, reserveOut);
         if (amountOut == 0) revert InsufficientOutputAmount(0, minOut);
         if (amountOut < minOut) revert InsufficientOutputAmount(amountOut, minOut);
@@ -368,14 +306,10 @@ contract PredictionMarket is
         uint256 newReserveIn  = reserveIn  + amountIn;
         uint256 newReserveOut = reserveOut - amountOut;
 
-        // Belt-and-braces invariant assertion: k must not decrease.
-        // (Already implied by the formula, but we re-check to make the
-        // intent explicit and catch any future formula refactor.)
         uint256 kBefore = reserveIn * reserveOut;
         uint256 kAfter  = newReserveIn * newReserveOut;
         if (kAfter < kBefore) revert KInvariantBroken(kBefore, kAfter);
 
-        // ─── Effects ──────────────────────────────────────────────
         if (inIsYes) {
             _reserveYes = uint128(newReserveIn);
             _reserveNo  = uint128(newReserveOut);
@@ -384,32 +318,18 @@ contract PredictionMarket is
             _reserveYes = uint128(newReserveOut);
         }
 
-        // ─── Interactions ─────────────────────────────────────────
-        // Pull the input outcome from the trader.
         _outcome.safeTransferFrom(msg.sender, address(this), outcomeIn, amountIn, "");
-        // Send the output outcome to the trader.
         _outcome.safeTransferFrom(address(this), msg.sender, outcomeOut, amountOut, "");
 
         uint256 feePart = amountIn - ((amountIn * (BPS - _feeBps)) / BPS);
         emit Swap(msg.sender, outcomeIn, outcomeOut, amountIn, amountOut, feePart);
     }
 
-    /*//////////////////////////////////////////////////////////////
-                          COMPLETE SETS (1:1)
-    //////////////////////////////////////////////////////////////*/
-
     /// @inheritdoc IPredictionMarket
     function mintCompleteSets(uint256 amount) external nonReentrant whenNotPaused {
         if (amount == 0) revert ZeroAmount();
-        // Allowed only while the market is open; after lock, the AMM
-        // and complete-set mints are paused so reserve accounting
-        // matches the resolved-state collateral balance.
         _requireStatus(Status.Open);
 
-        // ─── Effects ──────────────────────────────────────────────
-        // (No reserve changes; the user is the recipient.)
-
-        // ─── Interactions ─────────────────────────────────────────
         _collateral.safeTransferFrom(msg.sender, address(this), amount);
         _outcome.mint(msg.sender, _yesId, amount);
         _outcome.mint(msg.sender, _noId,  amount);
@@ -421,24 +341,16 @@ contract PredictionMarket is
     function redeemCompleteSets(uint256 amount) external nonReentrant {
         if (amount == 0) revert ZeroAmount();
         Status s = Status(_statusByte);
-        // Allowed at any time except Finalized (where claimWinnings is
-        // the canonical path) and Disputed (where outcome is in limbo).
-        // In Invalid state, redeeming complete sets is the refund path.
         if (s == Status.Finalized || s == Status.Disputed) {
             revert InvalidState(s, Status.Open);
         }
 
-        // ─── Interactions (burn before transfer for CEI) ──────────
         _outcome.burn(msg.sender, _yesId, amount);
         _outcome.burn(msg.sender, _noId,  amount);
         _collateral.safeTransfer(msg.sender, amount);
 
         emit CompleteSetsRedeemed(msg.sender, amount);
     }
-
-    /*//////////////////////////////////////////////////////////////
-                          STATE TRANSITIONS
-    //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IPredictionMarket
     function lockMarket() external {
@@ -496,10 +408,6 @@ contract PredictionMarket is
         emit MarketInvalidated(msg.sender, reason);
     }
 
-    /*//////////////////////////////////////////////////////////////
-                          PULL-OVER-PUSH CLAIM
-    //////////////////////////////////////////////////////////////*/
-
     /// @inheritdoc IPredictionMarket
     function claimWinnings() external nonReentrant returns (uint256 collateralOut) {
         _requireStatus(Status.Finalized);
@@ -509,17 +417,12 @@ contract PredictionMarket is
         uint256 bal = _outcome.balanceOf(msg.sender, winningId);
         if (bal == 0) revert NothingToClaim();
 
-        // ─── Interactions (burn first → no balance to re-claim) ───
         _outcome.burn(msg.sender, winningId, bal);
         _collateral.safeTransfer(msg.sender, bal);
 
         collateralOut = bal;
         emit WinningsClaimed(msg.sender, bal, bal);
     }
-
-    /*//////////////////////////////////////////////////////////////
-                                  VIEWS
-    //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IPredictionMarket
     function reserves() external view returns (uint128 reserveYes, uint128 reserveNo) {
@@ -550,10 +453,6 @@ contract PredictionMarket is
         return _getAmountOut(amountIn, reserveIn, reserveOut);
     }
 
-    /*//////////////////////////////////////////////////////////////
-                              INTERNAL MATH
-    //////////////////////////////////////////////////////////////*/
-
     /// @dev Uniswap-V2 style with `_feeBps` fee applied to the input.
     ///
     ///     amountInWithFee = amountIn * (BPS - feeBps)
@@ -575,16 +474,14 @@ contract PredictionMarket is
         return numerator / denominator;
     }
 
-    /*//////////////////////////////////////////////////////////////
-                              ERC-165 / OZ
-    //////////////////////////////////////////////////////////////*/
-
     /// @dev Disambiguate the diamond inheritance of `supportsInterface`.
+    ///      Solidity 0.8.20+ rejects interfaces in override lists, so we
+    ///      enumerate only the concrete base contracts.
     function supportsInterface(bytes4 interfaceId)
         public
         view
         virtual
-        override(AccessControl, ERC1155Holder, IERC165)
+        override(AccessControl, ERC1155Holder)
         returns (bool)
     {
         return AccessControl.supportsInterface(interfaceId) || ERC1155Holder.supportsInterface(interfaceId);

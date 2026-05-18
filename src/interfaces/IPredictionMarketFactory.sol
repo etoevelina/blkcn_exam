@@ -11,9 +11,6 @@ pragma solidity 0.8.26;
 /// storage to make V1 → V2 upgrades collision-proof. See
 /// `docs/adr/ADR-002-uups-target-selection.md`.
 interface IPredictionMarketFactory {
-    /*//////////////////////////////////////////////////////////////
-                                 ERRORS
-    //////////////////////////////////////////////////////////////*/
 
     error AlreadyInitialized();
     error ZeroAddress();
@@ -22,10 +19,6 @@ interface IPredictionMarketFactory {
     error MarketAlreadyDeployed(address predicted);
     error UnknownMarket(address market);
     error InvalidQuestion();
-
-    /*//////////////////////////////////////////////////////////////
-                                 EVENTS
-    //////////////////////////////////////////////////////////////*/
 
     event MarketCreated(
         uint64 indexed marketId,
@@ -39,10 +32,6 @@ interface IPredictionMarketFactory {
     event DefaultsUpdated(uint16 defaultFeeBps, uint32 defaultDisputeWindow);
     event Upgraded(address indexed newImplementation);
 
-    /*//////////////////////////////////////////////////////////////
-                              FACTORY ACTIONS
-    //////////////////////////////////////////////////////////////*/
-
     /// @notice Deploy a new market via `CREATE`. The address is
     ///         determined by `(factoryAddress, factoryNonce)` and is
     ///         returned alongside the auto-incremented `marketId`.
@@ -50,7 +39,7 @@ interface IPredictionMarketFactory {
         bytes32 questionId,
         int256 oracleThreshold,
         uint64 tradingEndsAt,
-        uint16 feeBpsOverride // 0 → use default
+        uint16 feeBpsOverride
     ) external returns (uint64 marketId, address market);
 
     /// @notice Deploy a new market via `CREATE2` at a deterministic
@@ -67,10 +56,6 @@ interface IPredictionMarketFactory {
     ///         initialisation parameters. Implemented in inline Yul.
     function predictMarketAddress(bytes32 salt, bytes32 initCodeHash) external view returns (address predicted);
 
-    /*//////////////////////////////////////////////////////////////
-                                  VIEWS
-    //////////////////////////////////////////////////////////////*/
-
     function marketById(uint64 id) external view returns (address);
     function idByMarket(address market) external view returns (uint64);
     function nextMarketId() external view returns (uint64);
@@ -80,10 +65,6 @@ interface IPredictionMarketFactory {
     function outcomeToken() external view returns (address);
     function oracleAdapter() external view returns (address);
     function feeVault() external view returns (address);
-
-    /*//////////////////////////////////////////////////////////////
-                              ADMIN (TIMELOCK)
-    //////////////////////////////////////////////////////////////*/
 
     function setDefaults(uint16 newDefaultFeeBps, uint32 newDisputeWindow) external;
 }

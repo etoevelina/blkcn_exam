@@ -1,9 +1,3 @@
-// Single source of truth for deployed contract addresses. Reads
-// `deployments/arbitrum-sepolia.json` written by `script/Deploy.s.sol`.
-//
-// At build time Next.js inlines this JSON via static import, so the
-// frontend bundle always agrees with the latest verified deploy.
-
 import deployment from "../../../deployments/arbitrum-sepolia.json";
 
 import type { Address } from "viem";
@@ -11,11 +5,11 @@ import type { Address } from "viem";
 export interface ProtocolAddresses {
   collateralToken: Address;
   outcomeToken: Address;
-  oracleAdapter: Address;        // W8
-  feeVault: Address;             // W8
-  governanceToken: Address;      // W9
-  timelock: Address;             // W9
-  governor: Address;             // W9
+  oracleAdapter: Address;
+  feeVault: Address;
+  governanceToken: Address;
+  timelock: Address;
+  governor: Address;
   factoryProxy: Address;
   factoryImpl: Address;
 }

@@ -57,16 +57,11 @@ contract VaultInvariant is Fixture {
         uint256 sample = 1e6;
         if (vault.totalSupply() == 0) return;
         uint256 prev = vault.previewDeposit(sample);
-        // We can't actually deposit here (view-only invariant), so check the
-        // mathematical relationship: convertToShares with rounding-down must
-        // equal previewDeposit.
         assertEq(prev, vault.convertToShares(sample));
     }
 
     /// @dev Vault assets never go negative (handler tries random calls).
     function invariant_assetsNonNegative() public view {
-        // Just a smoke check — assertGe on totalAssets is always ≥ 0 since
-        // it's uint256 — we use it to make sure the call doesn't revert.
         assertGe(vault.totalAssets(), 0);
     }
 }

@@ -5,7 +5,6 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // Proposal state badges (mirrors OZ Governor.ProposalState enum).
         state: {
           pending: "#9ca3af",
           active: "#2563eb",

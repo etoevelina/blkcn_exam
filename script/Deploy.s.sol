@@ -41,43 +41,35 @@ contract Deploy is Script {
 
         vm.startBroadcast();
 
-        // ── Collateral ───────────────────────────────────────────
         if (ex.collateralToken == address(0)) {
             ex.collateralToken = address(new MockUSDC(deployer));
             console2.log("MockUSDC deployed:", ex.collateralToken);
         }
 
-        // ── OutcomeToken1155 ─────────────────────────────────────
         if (ex.outcomeToken == address(0)) {
             ex.outcomeToken = address(new OutcomeToken1155(deployer, ""));
             console2.log("OutcomeToken1155 deployed:", ex.outcomeToken);
         }
 
-        // ── OracleAdapter ────────────────────────────────────────
         if (ex.oracleAdapter == address(0)) {
             ex.oracleAdapter = address(new OracleAdapter(deployer));
             console2.log("OracleAdapter deployed:", ex.oracleAdapter);
         }
 
-        // ── FeeVault4626 ─────────────────────────────────────────
         if (ex.feeVault == address(0)) {
             ex.feeVault = address(new FeeVault4626(IERC20(ex.collateralToken), deployer));
             console2.log("FeeVault4626 deployed:", ex.feeVault);
         }
 
-        // ── GovernanceToken ──────────────────────────────────────
         if (ex.governanceToken == address(0)) {
             ex.governanceToken = address(new GovernanceToken(deployer));
             console2.log("GovernanceToken deployed:", ex.governanceToken);
         }
 
-        // ── Governor + Timelock (must be deployed together, two-step wiring) ──
         if (ex.timelock == address(0) && ex.governor == address(0)) {
-            // Step 1: Timelock with deployer as proposer (temporary).
-            ex.timelock = address(new PredictionTimelock(deployer));
+            ex.timelock = address(new PredictionTimelock(deployer, deployer));
             console2.log("PredictionTimelock deployed:", ex.timelock);
 
-            // Step 2: Governor pointed at the Timelock.
             ex.governor = address(
                 new PredictionGovernor(
                     GovernanceToken(ex.governanceToken),
@@ -86,15 +78,13 @@ contract Deploy is Script {
             );
             console2.log("PredictionGovernor deployed:", ex.governor);
 
-            // Step 3: Grant Governor the proposer + canceller roles on the Timelock,
-            // revoke deployer's temporary proposer role.
             PredictionTimelock tl = PredictionTimelock(payable(ex.timelock));
             tl.grantRole(tl.PROPOSER_ROLE(), ex.governor);
             tl.grantRole(tl.CANCELLER_ROLE(), ex.governor);
             tl.revokeRole(tl.PROPOSER_ROLE(), deployer);
+            tl.renounceRole(0x00, deployer);
         }
 
-        // ── Factory impl + proxy ─────────────────────────────────
         if (ex.factoryImpl == address(0)) {
             ex.factoryImpl = address(new PredictionMarketFactory());
             console2.log("Factory impl deployed:", ex.factoryImpl);
@@ -104,21 +94,20 @@ contract Deploy is Script {
             bytes memory initData = abi.encodeCall(
                 PredictionMarketFactory.initialize,
                 (
-                    ex.timelock,        // admin = Timelock (governance owns the factory)
-                    ex.governor,        // marketCreator = Governor (proposals create markets)
+                    ex.timelock,
+                    ex.governor,
                     ex.collateralToken,
                     ex.outcomeToken,
                     ex.oracleAdapter,
                     ex.feeVault,
-                    30,                 // 0.3% fee default
-                    24 hours            // 24h dispute window default
+                    30,
+                    24 hours
                 )
             );
             ex.factoryProxy = address(new ERC1967Proxy(ex.factoryImpl, initData));
             console2.log("Factory proxy deployed:", ex.factoryProxy);
         }
 
-        // ── Role transfers — deployer relinquishes everything to Timelock ──
         OutcomeToken1155 ot = OutcomeToken1155(ex.outcomeToken);
         if (!ot.hasRole(ot.FACTORY_ROLE(), ex.factoryProxy)) {
             ot.grantRole(ot.FACTORY_ROLE(), ex.factoryProxy);

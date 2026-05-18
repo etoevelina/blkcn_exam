@@ -1,10 +1,3 @@
-// =============================================================================
-// PredictionMarketFactory event handlers.
-//
-// Spawns a new dynamic `PredictionMarket` data source for every market
-// the factory creates, mirroring the on-chain factory pattern.
-// =============================================================================
-
 import { BigInt, Bytes, log } from "@graphprotocol/graph-ts";
 
 import {
@@ -15,10 +8,6 @@ import {
 import { PredictionMarket as PredictionMarketTemplate } from "../generated/templates";
 import { Market } from "../generated/schema";
 
-/* -------------------------------------------------------------------------- */
-/*  MarketCreated                                                             */
-/* -------------------------------------------------------------------------- */
-
 export function handleMarketCreated(event: MarketCreated): void {
   let marketAddress = event.params.market;
   let id = marketAddress.toHexString();
@@ -27,13 +16,10 @@ export function handleMarketCreated(event: MarketCreated): void {
   market.marketId = BigInt.fromU64(event.params.marketId);
   market.factory = event.address;
   market.questionId = event.params.questionId;
-  // oracleThreshold isn't in the MarketCreated event signature; we'll
-  // back-fill from a getter call in W9 once the ABI exposes it.
   market.oracleThreshold = BigInt.zero();
   market.collateralToken = Bytes.fromHexString("0x0000000000000000000000000000000000000000") as Bytes;
   market.outcomeToken    = Bytes.fromHexString("0x0000000000000000000000000000000000000000") as Bytes;
 
-  // YES/NO ids are deterministic from marketId.
   market.yesId = BigInt.fromU64(event.params.marketId).times(BigInt.fromI32(2));
   market.noId  = market.yesId.plus(BigInt.fromI32(1));
 
@@ -57,7 +43,6 @@ export function handleMarketCreated(event: MarketCreated): void {
 
   market.save();
 
-  // Spawn the dynamic data source for this market.
   PredictionMarketTemplate.create(marketAddress);
 
   log.info("Market {} (id={}) created at block {}", [
@@ -66,10 +51,6 @@ export function handleMarketCreated(event: MarketCreated): void {
     event.block.number.toString(),
   ]);
 }
-
-/* -------------------------------------------------------------------------- */
-/*  DefaultsUpdated, Upgraded — no entity changes, log only.                  */
-/* -------------------------------------------------------------------------- */
 
 export function handleDefaultsUpdated(event: DefaultsUpdated): void {
   log.info("Factory defaults updated: feeBps={}, disputeWindow={}", [

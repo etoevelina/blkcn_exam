@@ -12,8 +12,8 @@ import {GovernanceToken} from "../../src/governance/GovernanceToken.sol";
 contract TreasuryHandler is Test {
     GovernanceToken internal gov;
     address internal admin;
-    address[] internal userActors;   // can be `from` for transfers (EOAs)
-    address[] internal allActors;    // can be `to` (includes the treasury)
+    address[] internal userActors;
+    address[] internal allActors;
 
     constructor(GovernanceToken g, address admin_, address[] memory users_, address treasury) {
         gov = g;
@@ -39,9 +39,6 @@ contract TreasuryHandler is Test {
     }
 
     function transfer(uint96 amount, uint256 fromSeed, uint256 toSeed) external {
-        // The treasury only enters via `to`; it can never be the `from`
-        // side under the handler (governance-mediated transfers out of
-        // the treasury go through `execute`, not the handler).
         address from = _userActor(fromSeed);
         address to   = _anyActor(toSeed);
         uint256 bal  = gov.balanceOf(from);
@@ -77,8 +74,6 @@ contract TreasuryInvariant is Fixture {
         allActors.push(carol);
         allActors.push(address(timelock));
 
-        // Seed treasury (timelock) with some governance tokens — simulates
-        // a community-initiated transfer to the treasury.
         vm.prank(admin);
         gov.mint(address(timelock), 100_000e18);
         timelockStartBalance = gov.balanceOf(address(timelock));
@@ -87,10 +82,6 @@ contract TreasuryInvariant is Fixture {
         targetContract(address(handler));
     }
 
-    /* ──────────────────────────────────────────────────────────────────
-     *  Invariant 1 — total-supply conservation.
-     *  ERC-20 sum-of-balances must equal totalSupply at all times.
-     * ──────────────────────────────────────────────────────────────── */
     function invariant_totalSupplyEqualsSumOfBalances() public view {
         uint256 sum;
         for (uint256 i = 0; i < allActors.length; i++) {
@@ -99,12 +90,6 @@ contract TreasuryInvariant is Fixture {
         assertEq(sum, gov.totalSupply(), "totalSupply != sum(balanceOf)");
     }
 
-    /* ──────────────────────────────────────────────────────────────────
-     *  Invariant 2 — treasury accounting.
-     *  The Timelock balance can only decrease via an `execute` call,
-     *  which the handler never makes. Therefore the timelock balance
-     *  must be ≥ its starting balance at every snapshot.
-     * ──────────────────────────────────────────────────────────────── */
     function invariant_treasuryBalanceMonotonicUnderHandler() public view {
         assertGe(
             gov.balanceOf(address(timelock)),

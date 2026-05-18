@@ -7,12 +7,9 @@ const wcProjectId = process.env.NEXT_PUBLIC_WC_PROJECT_ID;
 
 export const wagmiConfig = createConfig({
   chains: [TARGET_CHAIN],
-  // SSR support — Next.js App Router needs this on or hydration warns.
   ssr: true,
   connectors: [
     injected({ shimDisconnect: true }),
-    // WalletConnect is opt-in: only register the connector if a project
-    // id is configured. Avoids loud console warnings in dev.
     ...(wcProjectId
       ? [
           walletConnect({

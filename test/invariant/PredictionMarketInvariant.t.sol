@@ -65,16 +65,9 @@ contract PredictionMarketInvariant is Fixture {
 
     /// @dev YES supply equals NO supply at all times (complete-set invariant).
     function invariant_supplyParity() public view {
-        // Pool reserves plus user holdings sum up identically on both sides:
-        // for the singleton ERC-1155, totalSupply isn't exposed for a single
-        // id, so we sample known holders.
-        // (Foundry invariant runner only exercises the handler's prank-user,
-        //  so checking bob + market covers everything.)
         uint256 yesBob = outcomeToken.balanceOf(bob, market.yesId());
         uint256 noBob  = outcomeToken.balanceOf(bob, market.noId());
         (uint128 ry, uint128 rn) = market.reserves();
-        // pool + bob = total minted; mints always come in equal pairs, so
-        // pool YES + bob YES == pool NO + bob NO.
         assertEq(uint256(ry) + yesBob, uint256(rn) + noBob);
     }
 }

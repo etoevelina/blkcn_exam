@@ -49,7 +49,6 @@ contract ForkTests is Test {
         IAggregator feed = IAggregator(CHAINLINK_BTCUSD);
         (, int256 answer, , uint256 ts, ) = feed.latestRoundData();
         assertGt(answer, 0);
-        // updatedAt must be within last 24 h for a working feed.
         assertLt(block.timestamp - ts, 1 days);
         assertEq(feed.decimals(), 8);
     }
@@ -66,7 +65,6 @@ contract ForkTests is Test {
         path[0] = WETH;
         path[1] = USDC_MAINNET;
         uint256[] memory out = router.getAmountsOut(1 ether, path);
-        // Should always be at least $100 worth — sanity, no concrete number.
         assertGt(out[1], 100 * 1e6);
     }
 }

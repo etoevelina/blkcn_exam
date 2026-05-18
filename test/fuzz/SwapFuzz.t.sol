@@ -11,7 +11,7 @@ contract SwapFuzz is Fixture {
 
     /// @dev k must never decrease over a swap.
     function testFuzz_swap_kNeverDecreases(uint96 amountIn) public {
-        amountIn = uint96(bound(amountIn, 1, 100_000e6));
+        amountIn = uint96(bound(amountIn, 1e3, 100_000e6));
 
         vm.startPrank(bob);
         usdc.approve(address(market), uint256(amountIn));

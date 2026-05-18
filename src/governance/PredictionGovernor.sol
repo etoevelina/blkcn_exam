@@ -35,18 +35,14 @@ contract PredictionGovernor is
     constructor(IVotes token_, TimelockController timelock_)
         Governor("PredictionGovernor")
         GovernorSettings(
-            1 days,                  // voting delay
-            1 weeks,                 // voting period
-            0                        // proposalThreshold: computed dynamically below
+            1 days,
+            1 weeks,
+            0
         )
         GovernorVotes(token_)
-        GovernorVotesQuorumFraction(4)   // quorum = 4%
+        GovernorVotesQuorumFraction(4)
         GovernorTimelockControl(timelock_)
     {}
-
-    /*//////////////////////////////////////////////////////////////
-                          PROPOSAL THRESHOLD = 1%
-    //////////////////////////////////////////////////////////////*/
 
     /// @dev Returns 1% of the token's current total supply. Implemented as
     ///      a dynamic readout (rather than a fixed constant in
@@ -58,13 +54,8 @@ contract PredictionGovernor is
         override(Governor, GovernorSettings)
         returns (uint256)
     {
-        // 1% of total voting supply.
         return token().getPastTotalSupply(clock() - 1) / 100;
     }
-
-    /*//////////////////////////////////////////////////////////////
-                          MULTIPLE-INHERITANCE GLUE
-    //////////////////////////////////////////////////////////////*/
 
     function state(uint256 proposalId)
         public

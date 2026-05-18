@@ -13,14 +13,12 @@ contract VaultFuzz is Fixture {
         uint256 out = vault.redeem(shares, alice, alice);
         vm.stopPrank();
 
-        // Vault must never pay back more than deposited (rounding favours vault).
         assertLe(out, uint256(amount));
     }
 
     function testFuzz_previewDeposit_underActual(uint96 amount) public {
         amount = uint96(bound(amount, 1, 1_000_000e6));
 
-        // Seed the vault first so the offset is non-trivial.
         vm.startPrank(alice);
         usdc.approve(address(vault), 1_000e6);
         vault.deposit(1_000e6, alice);

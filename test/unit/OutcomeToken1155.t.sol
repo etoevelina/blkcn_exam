@@ -19,23 +19,23 @@ contract OutcomeToken1155Test is Fixture {
     }
 
     function test_mint_revertsForNonMinter() public {
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                IOutcomeToken1155.NotMarketMinter.selector, alice, outcomeToken.yesIdOf(1)
-            )
+        uint256 yId = outcomeToken.yesIdOf(1);
+        bytes memory expected = abi.encodeWithSelector(
+            IOutcomeToken1155.NotMarketMinter.selector, alice, yId
         );
         vm.prank(alice);
-        outcomeToken.mint(alice, outcomeToken.yesIdOf(1), 1);
+        vm.expectRevert(expected);
+        outcomeToken.mint(alice, yId, 1);
     }
 
     function test_burn_revertsForNonMinter() public {
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                IOutcomeToken1155.NotMarketMinter.selector, alice, outcomeToken.yesIdOf(1)
-            )
+        uint256 yId = outcomeToken.yesIdOf(1);
+        bytes memory expected = abi.encodeWithSelector(
+            IOutcomeToken1155.NotMarketMinter.selector, alice, yId
         );
         vm.prank(alice);
-        outcomeToken.burn(alice, outcomeToken.yesIdOf(1), 1);
+        vm.expectRevert(expected);
+        outcomeToken.burn(alice, yId, 1);
     }
 
     function test_registerMarket_revertsOnDoubleRegister() public {
@@ -61,11 +61,8 @@ contract OutcomeToken1155Test is Fixture {
     }
 
     function test_supportsInterface_acceptsERC1155AndAccessControl() public view {
-        // ERC-165 itself
         assertTrue(outcomeToken.supportsInterface(0x01ffc9a7));
-        // ERC-1155
         assertTrue(outcomeToken.supportsInterface(0xd9b67a26));
-        // AccessControl
         assertTrue(outcomeToken.supportsInterface(0x7965db0b));
     }
 }

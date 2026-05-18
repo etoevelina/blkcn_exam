@@ -1,10 +1,6 @@
-// Mirror of subgraph/queries/*.graphql as gql tagged-template literals so
-// urql can co-locate the queries with the frontend hooks. Five queries,
-// one per file in `subgraph/queries/`.
-
 import { gql } from "urql";
 
-export const ACTIVE_MARKETS = gql/* GraphQL */ `
+export const ACTIVE_MARKETS = gql `
   query ActiveMarkets($first: Int = 25, $skip: Int = 0) {
     markets(
       first: $first
@@ -30,7 +26,7 @@ export const ACTIVE_MARKETS = gql/* GraphQL */ `
   }
 `;
 
-export const MARKET_DETAIL = gql/* GraphQL */ `
+export const MARKET_DETAIL = gql `
   query MarketDetail($id: ID!, $recent: Int = 20) {
     market(id: $id) {
       id
@@ -83,7 +79,7 @@ export const MARKET_DETAIL = gql/* GraphQL */ `
   }
 `;
 
-export const USER_PORTFOLIO = gql/* GraphQL */ `
+export const USER_PORTFOLIO = gql `
   query UserPortfolio($user: Bytes!, $first: Int = 50) {
     userPositions(
       first: $first
@@ -112,7 +108,7 @@ export const USER_PORTFOLIO = gql/* GraphQL */ `
   }
 `;
 
-export const ACTIVE_PROPOSALS = gql/* GraphQL */ `
+export const ACTIVE_PROPOSALS = gql `
   query ActiveProposals($first: Int = 50) {
     proposals(
       first: $first
@@ -145,7 +141,7 @@ export const ACTIVE_PROPOSALS = gql/* GraphQL */ `
   }
 `;
 
-export const MARKET_STATS = gql/* GraphQL */ `
+export const MARKET_STATS = gql `
   query MarketStats($first: Int = 10) {
     markets(
       first: $first

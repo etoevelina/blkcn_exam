@@ -30,27 +30,16 @@ import {IOutcomeToken1155} from "../interfaces/IOutcomeToken1155.sol";
 ///     in the audit report (Trust Assumption T-3).
 ///   * No `tx.origin`, no `block.timestamp` in authorisation logic.
 contract OutcomeToken1155 is ERC1155, AccessControl, IOutcomeToken1155 {
-    /*//////////////////////////////////////////////////////////////
-                                 ROLES
-    //////////////////////////////////////////////////////////////*/
 
     /// @notice Granted to the `PredictionMarketFactory` (proxy address).
     ///         The factory is the only contract permitted to register
     ///         new markets.
     bytes32 public constant FACTORY_ROLE = keccak256("FACTORY_ROLE");
 
-    /*//////////////////////////////////////////////////////////////
-                                 STORAGE
-    //////////////////////////////////////////////////////////////*/
-
     /// @dev token id => market address authorised to mint/burn it.
     mapping(uint256 id => address market) private _marketOfId;
     /// @dev marketId => registered (true once and only once).
     mapping(uint64 marketId => bool registered) private _registered;
-
-    /*//////////////////////////////////////////////////////////////
-                              CONSTRUCTOR
-    //////////////////////////////////////////////////////////////*/
 
     /// @param admin    Timelock / DAO that owns role administration.
     /// @param baseUri  ERC-1155 base URI (e.g. "ipfs://.../{id}.json").
@@ -58,10 +47,6 @@ contract OutcomeToken1155 is ERC1155, AccessControl, IOutcomeToken1155 {
         if (admin == address(0)) revert InvalidMarket(address(0));
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
     }
-
-    /*//////////////////////////////////////////////////////////////
-                          MARKET REGISTRATION
-    //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IOutcomeToken1155
     /// @dev Called by the factory once per market, atomically with the
@@ -79,10 +64,6 @@ contract OutcomeToken1155 is ERC1155, AccessControl, IOutcomeToken1155 {
 
         emit MarketRegistered(marketId_, market);
     }
-
-    /*//////////////////////////////////////////////////////////////
-                              MINT / BURN
-    //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IOutcomeToken1155
     function mint(address to, uint256 id, uint256 amount) external {
@@ -102,10 +83,6 @@ contract OutcomeToken1155 is ERC1155, AccessControl, IOutcomeToken1155 {
         emit OutcomeBurned(uint64(id >> 1), id, from, amount);
     }
 
-    /*//////////////////////////////////////////////////////////////
-                                  VIEWS
-    //////////////////////////////////////////////////////////////*/
-
     /// @inheritdoc IOutcomeToken1155
     function yesIdOf(uint64 marketId_) public pure returns (uint256) {
         return uint256(marketId_) << 1;
@@ -120,10 +97,6 @@ contract OutcomeToken1155 is ERC1155, AccessControl, IOutcomeToken1155 {
     function marketOf(uint256 id) external view returns (address) {
         return _marketOfId[id];
     }
-
-    /*//////////////////////////////////////////////////////////////
-                              ERC-165 / OZ
-    //////////////////////////////////////////////////////////////*/
 
     /// @dev Multiple inheritance disambiguation for `supportsInterface`.
     function supportsInterface(bytes4 interfaceId)

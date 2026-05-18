@@ -1,11 +1,3 @@
-// =============================================================================
-// OpenZeppelin Governor event handlers.
-//
-// Caches enough proposal state to power the proposal list page without
-// hammering RPC. Authoritative `state(proposalId)` cross-checks happen
-// on the frontend via wagmi useReadContract.
-// =============================================================================
-
 import { BigInt, log } from "@graphprotocol/graph-ts";
 
 import {
@@ -28,19 +20,12 @@ function supportToEnum(support: i32): string {
   return "Abstain";
 }
 
-/* -------------------------------------------------------------------------- */
-/*  ProposalCreated                                                           */
-/* -------------------------------------------------------------------------- */
-
 export function handleProposalCreated(event: ProposalCreated): void {
   let p = new Proposal(event.params.proposalId.toHex());
   p.governor = event.address;
   p.proposer = event.params.proposer;
   p.description = event.params.description;
-  // OZ Governor's descriptionHash is keccak256(bytes(description)); the
-  // event doesn't carry it explicitly, so the frontend recomputes when
-  // it needs to queue/execute.
-  p.descriptionHash = event.params.proposalId.reverse(); // placeholder; recomputed off-chain
+  p.descriptionHash = event.params.proposalId.reverse();
 
   let targets = event.params.targets;
   let targetBytes: Array<Bytes> = [];
@@ -69,10 +54,6 @@ export function handleProposalCreated(event: ProposalCreated): void {
   p.save();
   log.info("Proposal {} created by {}", [p.id, event.params.proposer.toHexString()]);
 }
-
-/* -------------------------------------------------------------------------- */
-/*  VoteCast / VoteCastWithParams                                             */
-/* -------------------------------------------------------------------------- */
 
 export function handleVoteCast(event: VoteCast): void {
   recordVote(
@@ -135,14 +116,9 @@ function recordVote(
   else if (support == 1) p.forVotes     = p.forVotes.plus(weight);
   else                   p.abstainVotes = p.abstainVotes.plus(weight);
 
-  // Once a vote arrives, the proposal is at least Active.
   if (p.statusSnapshot == "Pending") p.statusSnapshot = "Active";
   p.save();
 }
-
-/* -------------------------------------------------------------------------- */
-/*  Queue / Execute / Cancel                                                  */
-/* -------------------------------------------------------------------------- */
 
 export function handleProposalQueued(event: ProposalQueued): void {
   let p = loadProposal(event.params.proposalId);
@@ -169,6 +145,4 @@ export function handleProposalCanceled(event: ProposalCanceled): void {
   p.save();
 }
 
-/* AssemblyScript needs an explicit Bytes import only when we actually
-   spell the type, which we do above. */
 import { Bytes } from "@graphprotocol/graph-ts";

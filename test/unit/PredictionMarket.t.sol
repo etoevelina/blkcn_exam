@@ -25,10 +25,12 @@ contract PredictionMarketTest is Fixture {
     }
 
     function test_addLiquidity_revertsBelowMinLiquidity() public {
+        uint256 minLiq = market.MIN_LIQUIDITY();
+        uint256 deadline = block.timestamp + 1 hours;
         vm.startPrank(alice);
-        usdc.approve(address(market), market.MIN_LIQUIDITY());
+        usdc.approve(address(market), minLiq);
         vm.expectRevert(IPredictionMarket.InsufficientLiquidity.selector);
-        market.addLiquidity(market.MIN_LIQUIDITY(), 0, block.timestamp + 1 hours);
+        market.addLiquidity(minLiq, 0, deadline);
         vm.stopPrank();
     }
 
@@ -53,17 +55,19 @@ contract PredictionMarketTest is Fixture {
     }
 
     function test_swap_revertsBeforeLiquidity() public {
+        uint256 yId = market.yesId();
+        uint256 nId = market.noId();
+        uint256 deadline = block.timestamp + 1 hours;
         vm.startPrank(alice);
         outcomeToken.setApprovalForAll(address(market), true);
         vm.expectRevert(IPredictionMarket.InsufficientLiquidity.selector);
-        market.swap(market.yesId(), market.noId(), 1e6, 0, block.timestamp + 1 hours);
+        market.swap(yId, nId, 1e6, 0, deadline);
         vm.stopPrank();
     }
 
     function test_swap_yesToNo_reducesReserveOut() public {
         _approveAndAddLiquidity(alice, 100_000e6);
 
-        // alice mints complete sets so she has YES to sell.
         vm.startPrank(alice);
         usdc.approve(address(market), 10_000e6);
         market.mintCompleteSets(10_000e6);
@@ -81,24 +85,28 @@ contract PredictionMarketTest is Fixture {
 
     function test_swap_revertsOnSameOutcome() public {
         _approveAndAddLiquidity(alice, 100_000e6);
+        uint256 yId = market.yesId();
+        uint256 deadline = block.timestamp + 1 hours;
         vm.prank(alice);
         vm.expectRevert(IPredictionMarket.SameOutcomeSwap.selector);
-        market.swap(market.yesId(), market.yesId(), 1e6, 0, block.timestamp + 1 hours);
+        market.swap(yId, yId, 1e6, 0, deadline);
     }
 
     function test_swap_revertsOnSlippage() public {
         _approveAndAddLiquidity(alice, 100_000e6);
+        uint256 yId = market.yesId();
+        uint256 nId = market.noId();
+        uint256 expected = market.getAmountOut(1_000e6, 100_000e6, 100_000e6);
+        uint256 deadline = block.timestamp + 1 hours;
+        bytes memory expectedRevert = abi.encodeWithSelector(
+            IPredictionMarket.InsufficientOutputAmount.selector, expected, expected + 1
+        );
 
         vm.startPrank(alice);
         usdc.approve(address(market), 10_000e6);
         market.mintCompleteSets(10_000e6);
-        uint256 expected = market.getAmountOut(1_000e6, 100_000e6, 100_000e6);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                IPredictionMarket.InsufficientOutputAmount.selector, expected, expected + 1
-            )
-        );
-        market.swap(market.yesId(), market.noId(), 1_000e6, expected + 1, block.timestamp + 1 hours);
+        vm.expectRevert(expectedRevert);
+        market.swap(yId, nId, 1_000e6, expected + 1, deadline);
         vm.stopPrank();
     }
 
@@ -144,19 +152,16 @@ contract PredictionMarketTest is Fixture {
     function test_lockReportFinalize_happyPath() public {
         _approveAndAddLiquidity(alice, 100_000e6);
 
-        // Advance to trading-end and lock.
         vm.warp(tradingEndsAt + 1);
         market.lockMarket();
         assertEq(uint8(market.status()), uint8(IPredictionMarket.Status.Locked));
 
-        // Push a fresh, above-threshold price into the feed.
         feed.setPrice(110_000e8);
         vm.prank(admin);
         market.reportOutcome();
         assertEq(uint8(market.status()), uint8(IPredictionMarket.Status.Reported));
-        assertEq(market.winningOutcome(), 0);   // YES
+        assertEq(market.winningOutcome(), 0);
 
-        // Skip the dispute window and finalise.
         vm.warp(market.disputeEndsAt() + 1);
         market.finalize();
         assertEq(uint8(market.status()), uint8(IPredictionMarket.Status.Finalized));
@@ -165,7 +170,6 @@ contract PredictionMarketTest is Fixture {
     function test_claimWinnings_pullsCollateralOneToOne() public {
         _approveAndAddLiquidity(alice, 100_000e6);
 
-        // bob mints a complete set and sells NO so he holds extra YES.
         vm.startPrank(bob);
         usdc.approve(address(market), 5_000e6);
         outcomeToken.setApprovalForAll(address(market), true);
@@ -174,7 +178,6 @@ contract PredictionMarketTest is Fixture {
         uint256 yesBal = outcomeToken.balanceOf(bob, market.yesId());
         vm.stopPrank();
 
-        // Resolve YES.
         vm.warp(tradingEndsAt + 1);
         market.lockMarket();
         feed.setPrice(110_000e8);
@@ -183,7 +186,6 @@ contract PredictionMarketTest is Fixture {
         vm.warp(market.disputeEndsAt() + 1);
         market.finalize();
 
-        // bob claims.
         uint256 usdcBefore = usdc.balanceOf(bob);
         vm.prank(bob);
         uint256 paid = market.claimWinnings();
@@ -192,14 +194,10 @@ contract PredictionMarketTest is Fixture {
     }
 
     function test_claimWinnings_revertsBeforeFinalize() public {
-        vm.expectRevert();   // InvalidState
+        vm.expectRevert();
         vm.prank(alice);
         market.claimWinnings();
     }
-
-    /*//////////////////////////////////////////////////////////////
-                  ADDITIONAL COVERAGE: lifecycle branches
-    //////////////////////////////////////////////////////////////*/
 
     function test_disputeOutcome_happyPath() public {
         _approveAndAddLiquidity(alice, 100_000e6);
@@ -224,7 +222,7 @@ contract PredictionMarketTest is Fixture {
 
         vm.warp(market.disputeEndsAt() + 1);
         vm.prank(admin);
-        vm.expectRevert();   // DisputeWindowOver
+        vm.expectRevert();
         market.disputeOutcome();
     }
 
@@ -234,12 +232,12 @@ contract PredictionMarketTest is Fixture {
         market.lockMarket();
         feed.setPrice(110_000e8);
         vm.prank(admin);
-        market.reportOutcome();   // outcome = YES
+        market.reportOutcome();
         vm.prank(admin);
         market.disputeOutcome();
 
         vm.prank(admin);
-        market.resolveDispute(1);   // governance overrides to NO
+        market.resolveDispute(1);
         assertEq(uint8(market.status()), uint8(IPredictionMarket.Status.Finalized));
         assertEq(market.winningOutcome(), 1);
     }
@@ -255,14 +253,13 @@ contract PredictionMarketTest is Fixture {
         market.disputeOutcome();
 
         vm.prank(admin);
-        vm.expectRevert();   // InvalidOutcomeId(2)
+        vm.expectRevert();
         market.resolveDispute(2);
     }
 
     function test_setInvalid_voidsMarketAndRefunds() public {
         _approveAndAddLiquidity(alice, 100_000e6);
 
-        // mint some complete sets in Open state
         vm.startPrank(bob);
         usdc.approve(address(market), 5_000e6);
         outcomeToken.setApprovalForAll(address(market), true);
@@ -273,7 +270,6 @@ contract PredictionMarketTest is Fixture {
         market.setInvalid("oracle compromise");
         assertEq(uint8(market.status()), uint8(IPredictionMarket.Status.Invalid));
 
-        // bob redeems his complete sets after invalidation
         uint256 usdcBefore = usdc.balanceOf(bob);
         vm.prank(bob);
         market.redeemCompleteSets(5_000e6);
@@ -291,7 +287,7 @@ contract PredictionMarketTest is Fixture {
         market.finalize();
 
         vm.prank(admin);
-        vm.expectRevert();   // InvalidState
+        vm.expectRevert();
         market.setInvalid("too late");
     }
 
@@ -302,8 +298,7 @@ contract PredictionMarketTest is Fixture {
         feed.setPrice(110_000e8);
         vm.prank(admin);
         market.reportOutcome();
-        // window not yet over
-        vm.expectRevert();   // DisputeWindowActive
+        vm.expectRevert();
         market.finalize();
     }
 
@@ -314,7 +309,7 @@ contract PredictionMarketTest is Fixture {
         feed.setPrice(110_000e8);
 
         vm.prank(alice);
-        vm.expectRevert();   // AccessControl
+        vm.expectRevert();
         market.reportOutcome();
     }
 
@@ -325,7 +320,6 @@ contract PredictionMarketTest is Fixture {
         vm.prank(admin);
         market.unpause();
 
-        // Now swap should succeed again.
         uint256 yId = market.yesId();
         uint256 nId = market.noId();
         uint256 deadline = block.timestamp + 1 hours;
@@ -344,7 +338,7 @@ contract PredictionMarketTest is Fixture {
         vm.startPrank(alice);
         usdc.approve(address(market), 1_000e6);
         market.mintCompleteSets(1_000e6);
-        vm.expectRevert();   // InvalidOutcomeId
+        vm.expectRevert();
         market.swap(yId, bogus, 1e6, 0, deadline);
         vm.stopPrank();
     }
@@ -356,7 +350,7 @@ contract PredictionMarketTest is Fixture {
         uint256 deadline = block.timestamp + 1 hours;
         vm.startPrank(alice);
         usdc.approve(address(market), 100e6);
-        vm.expectRevert();   // EnforcedPause
+        vm.expectRevert();
         market.addLiquidity(100e6, 0, deadline);
         vm.stopPrank();
     }
@@ -368,7 +362,7 @@ contract PredictionMarketTest is Fixture {
 
         vm.startPrank(alice);
         usdc.approve(address(market), 100e6);
-        vm.expectRevert();   // InvalidState
+        vm.expectRevert();
         market.mintCompleteSets(100e6);
         vm.stopPrank();
     }
@@ -376,14 +370,12 @@ contract PredictionMarketTest is Fixture {
     function test_redeemCompleteSets_revertsWhenFinalized() public {
         _approveAndAddLiquidity(alice, 100_000e6);
 
-        // Mint some complete sets while open.
         vm.startPrank(bob);
         usdc.approve(address(market), 1_000e6);
         outcomeToken.setApprovalForAll(address(market), true);
         market.mintCompleteSets(1_000e6);
         vm.stopPrank();
 
-        // Drive to Finalized.
         vm.warp(tradingEndsAt + 1);
         market.lockMarket();
         feed.setPrice(110_000e8);
@@ -392,7 +384,6 @@ contract PredictionMarketTest is Fixture {
         vm.warp(market.disputeEndsAt() + 1);
         market.finalize();
 
-        // redeem must revert in Finalized state (claimWinnings is the path).
         vm.prank(bob);
         vm.expectRevert();
         market.redeemCompleteSets(1_000e6);
@@ -400,13 +391,16 @@ contract PredictionMarketTest is Fixture {
 
     function test_pauseBlocksSwap() public {
         _approveAndAddLiquidity(alice, 100_000e6);
+        uint256 yId = market.yesId();
+        uint256 nId = market.noId();
+        uint256 deadline = block.timestamp + 1 hours;
+
         vm.prank(admin);
         market.pause();
+
         vm.startPrank(alice);
-        usdc.approve(address(market), 1_000e6);
-        market.mintCompleteSets(0);    // would revert with ZeroAmount but we test pause first
-        vm.expectRevert();             // EnforcedPause
-        market.swap(market.yesId(), market.noId(), 1_000e6, 0, block.timestamp + 1 hours);
+        vm.expectRevert();
+        market.swap(yId, nId, 1_000e6, 0, deadline);
         vm.stopPrank();
     }
 }

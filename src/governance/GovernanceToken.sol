@@ -31,18 +31,10 @@ contract GovernanceToken is ERC20, ERC20Permit, ERC20Votes, AccessControl {
         _grantRole(MINTER_ROLE, admin);
     }
 
-    /*//////////////////////////////////////////////////////////////
-                                 MINT
-    //////////////////////////////////////////////////////////////*/
-
     function mint(address to, uint256 amount) external onlyRole(MINTER_ROLE) {
         if (totalSupply() + amount > CAP) revert CapExceeded(totalSupply() + amount, CAP);
         _mint(to, amount);
     }
-
-    /*//////////////////////////////////////////////////////////////
-                          CLOCK — TIMESTAMP MODE
-    //////////////////////////////////////////////////////////////*/
 
     /// @dev L2 deployments need timestamp-mode clock because L2 block
     ///      production is variable; OZ Governor will reflect the same
@@ -54,10 +46,6 @@ contract GovernanceToken is ERC20, ERC20Permit, ERC20Votes, AccessControl {
     function CLOCK_MODE() public pure override returns (string memory) {
         return "mode=timestamp";
     }
-
-    /*//////////////////////////////////////////////////////////////
-                              DISAMBIGUATION
-    //////////////////////////////////////////////////////////////*/
 
     function _update(address from, address to, uint256 value) internal override(ERC20, ERC20Votes) {
         super._update(from, to, value);

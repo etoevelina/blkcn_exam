@@ -1,13 +1,5 @@
 "use client";
 
-// Reads:
-//   * collateral (USDC) balance       — erc20.balanceOf(user)
-//   * governance token balance        — gov.balanceOf(user)
-//   * voting power (current)          — gov.getVotes(user)
-//   * delegate address                — gov.delegates(user)
-//
-// All four come back in a single multicall via useReadContracts.
-
 import { useAccount, useReadContracts } from "wagmi";
 
 import { addresses } from "@/lib/addresses";

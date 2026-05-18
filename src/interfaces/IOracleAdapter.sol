@@ -19,25 +19,14 @@ pragma solidity 0.8.26;
 /// answer if the underlying feed updated; the market is responsible for
 /// snapshotting the result the first time it's read.
 interface IOracleAdapter {
-    /*//////////////////////////////////////////////////////////////
-                                 ERRORS
-    //////////////////////////////////////////////////////////////*/
 
     error StalePrice(uint256 updatedAt, uint256 staleness);
     error InvalidPrice(int256 price);
     error UnknownFeed(bytes32 questionId);
     error FeedAlreadyRegistered(bytes32 questionId);
 
-    /*//////////////////////////////////////////////////////////////
-                                 EVENTS
-    //////////////////////////////////////////////////////////////*/
-
     event FeedRegistered(bytes32 indexed questionId, address feed, uint256 staleness, uint256 disputeWindow);
     event FeedUpdated(bytes32 indexed questionId, address feed, uint256 staleness, uint256 disputeWindow);
-
-    /*//////////////////////////////////////////////////////////////
-                                  VIEWS
-    //////////////////////////////////////////////////////////////*/
 
     /// @notice Return the latest non-stale signed price for `questionId`.
     /// @dev Reverts on stale / negative / zero price.

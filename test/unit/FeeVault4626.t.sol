@@ -26,18 +26,15 @@ contract FeeVault4626Test is Fixture {
         uint256 shares = vault.deposit(1_000e6, alice);
         uint256 out = vault.redeem(shares, alice, alice);
         vm.stopPrank();
-        // With no fees in, round-trip should return everything modulo dust.
         assertApproxEqAbs(out, 1_000e6, 1);
     }
 
     function test_receiveFees_boostsAssets() public {
-        // alice deposits.
         vm.startPrank(alice);
         usdc.approve(address(vault), 1_000e6);
         vault.deposit(1_000e6, alice);
         vm.stopPrank();
 
-        // bob acts as a market — pushes fees in.
         vm.startPrank(bob);
         usdc.approve(address(vault), 100e6);
         vault.receiveFees(100e6);
@@ -45,7 +42,6 @@ contract FeeVault4626Test is Fixture {
 
         assertEq(vault.totalAssets(), 1_100e6);
 
-        // alice's share count is unchanged, but it now redeems for more.
         uint256 redeemable = vault.previewRedeem(vault.balanceOf(alice));
         assertGt(redeemable, 1_000e6);
     }
@@ -57,7 +53,6 @@ contract FeeVault4626Test is Fixture {
         vm.stopPrank();
 
         uint256 assets = 1_000e6;
-        // previewDeposit(x) <= deposit(x)  =>  shares from preview <= shares minted
         uint256 sharesPrev = vault.previewDeposit(assets);
         vm.prank(alice);
         uint256 minted = vault.deposit(assets, alice);
@@ -109,7 +104,7 @@ contract FeeVault4626Test is Fixture {
 
         vm.startPrank(alice);
         usdc.approve(address(vault), 1e6);
-        vault.deposit(1e6, alice);   // succeeds after unpause
+        vault.deposit(1e6, alice);
         vm.stopPrank();
     }
 
@@ -122,7 +117,6 @@ contract FeeVault4626Test is Fixture {
         vm.prank(admin);
         vault.pause();
 
-        // Redeem is intentionally not paused — funds always retrievable.
         vm.prank(alice);
         vault.redeem(shares, alice, alice);
     }
